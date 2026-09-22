@@ -1,1329 +1,6183 @@
-local startTime = tick()
-local worldMap = {
-    [85211729168715] = true,
-    [79091703265657] = true,
-    [100117331123089] = true
+-- ============================================================
+-- KAITUN SCRIPT - TÍCH HỢP AUTO FULL MELEE + EQUIP WEAPON
+-- Version 2.2 - SẴN SÀNG CHẠY
+-- FAST ATTACK + EQUIP WEAPON LẤY TỪ TEST.TXT (GIỮ NGUYÊN)
+-- UI TỪ DYNAMICISLAND (CÓ DISCORD)
+-- ĐẦY ĐỦ CHỨC NĂNG: AUTO FULL MELEE, AUTO RAID ICE, LOW GRAPHICS, SEA2/3, SABER, SOUL GUITAR, V.V.
+-- ============================================================
+
+Config = {
+    Team = "Pirates",
+    Configuration = {
+        HopWhenIdle = true,
+        AutoHop = true,
+        AutoHopDelay = 60 * 60,
+        FpsBoost = false,
+        blackscreen = false,
+        LowGraphics = true
+    },
+    Items = {
+        AutoFullyMelees = true,
+        Saber = true,
+        CursedDualKatana = true,
+        SoulGuitar = true,
+        RaceV2 = true,
+        AutoRaceV3 = true,
+        -- [ADDED] Auto Random Fruit — tự đổi ngẫu nhiên giữa các trái đang
+        -- SỞ HỮU (getInventoryFruits + LoadFruit, cả 2 đều là remote CÓ
+        -- THẬT, đã verify vì được dùng sẵn ở AutoRaidIce.GetCheapestFruit/
+        -- BuyChip trong chính file này). KHÔNG mua trái mới bằng tiền thật
+        -- — "BuyFruit" không phải remote có thật trong file, không tự chế.
+        AutoRandomFruit = false,
+    },
+    -- [MOVED LÊN ĐẦU] Config bật/tắt từng sword-boss — verified từ file
+    -- kaitun dự phòng. Đứng cùng chỗ với Items/Configuration cho dễ sửa
+    -- ngoài, đúng tinh thần "if config in configuration" ban đầu.
+    Sword = {
+        ["Shark Saw"]        = true,
+        ["Wardens Sword"]    = true,
+        ["Pole (1st Form)"]  = true,
+        ["Gravity Blade"]    = true,
+        ["Longsword"]        = true,
+        ["Rengoku"]          = true,
+        ["Flail"]            = true,
+        ["Twin Hooks"]       = true,
+    },
+    -- [MOVED LÊN ĐẦU] Config bật/tắt từng boss lấy vũ khí/vật phẩm hiếm
+    BossWeapons = {
+        ["Awakened Ice Admiral"] = true,
+        ["Tide Keeper"]          = true,
+        ["Deandre"]              = true,
+        ["Urban"]                = true,
+        ["Diablo"]               = true,
+        ["Soul Reaper"]          = true,
+        ["Cake Prince"]          = true,
+        ["Core"]                 = true,
+        ["Darkbeard"]            = true,
+        ["Katakuri"]             = true,
+        ["Beautiful Pirates"]    = true,
+    },
+    -- [NEW] Config riêng cho Auto Full Melee — boss man yêu cầu: đã mua
+    -- melee rồi thì check mastery (bật/tắt được từng phần)
+    Melee = {
+        AutoBuy              = true,  -- Tự mua melee khi đủ tiền/Fragments
+        CheckMasteryAfterBuy = true,  -- Đã mua rồi → check mastery liên tục
+        RaidAtV1Mastery      = 500,   -- V1 đạt mastery này → ưu tiên farm Raid lấy F cho V2
+        GodhumanAtV2Mastery  = 400,   -- V2 đạt mastery này → farm F+vật liệu cho Godhuman
+    },
+    -- [NEW] Auto mở Haki Quan Sát ("Ken") — spam liên tục tới khi mở được
+    AutoKen = true,
+    -- [NEW] Bật/tắt hệ thống Bring Mobs (trích từ Maru Hub, range 300)
+    BringMobs = true,
+    -- [NEW] Panic Mode — máu thấp thì bay lên trốn, hồi máu xong bay xuống
+    PanicMode = {
+        Enabled          = true,
+        LowHealthPercent = 20,   -- dưới % này thì bay lên trốn
+        SafeHealthPercent = 75,  -- lên trên % này (khi đang trốn) thì bay xuống lại
+        EscapeHeight     = 2000, -- bay lên bao nhiêu stud
+        CheckInterval    = 1,    -- giây, tần suất check máu
+    },
+    Settings = {
+        StayInSea2UntilHaveDarkFragments = true
+    },
+    AutoSea2 = true,
+    AutoSea3 = true,
+    AutoRaidIce_TargetFragments = 5000,
+    -- [FIXED - theo spec] Xoá KatakuriFarm/KatakuriFragGoal — không còn
+    -- logic nào dùng CakePrince để farm Fragment nữa (chỉ dùng raid)
 }
-local UserInput = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+print("[Tiro] Script da duoc nap, dang cho game load...")
+repeat task.wait() until game:IsLoaded()
 
-if worldMap[game.PlaceId] then
-    if game.PlaceId == 85211729168715 then
-        World1 = true
-    elseif game.PlaceId == 79091703265657 then
-        World2 = true
-    elseif game.PlaceId == 100117331123089 then
-        World3 = true
-    end
-else
-    print("Game Not Support")
-end
-local player = game.Players.LocalPlayer
-local Player = player
-if not getgenv().SettingFarm then
-    getgenv().SettingFarm = {
-        ["Hide UI"] = false,
-        ["White Screen"] = false,
-        ["Black Screen"] = false,
-        ["Lock Fps"] = {
-            ["Enabled"] = false,
-            ["FPS"] = 20,
-        },
-        ["HOP Delay"] = {
-            ["Enabled"] = true,
-            ["Delay"] = 10
-        },
-        ["Auto Chat"] = {
-            ["Enabled"] = false,
-            ["Text"] = "Lonely Hub On Top" -- or {"msg 1", "msg2", "msg3"}
-        },
-        ["Quest"] = {
-            ["Evo Race V1"] = true,
-            ["Evo Race V2"] = true,
-            ["RGB Haki"] = true,
-            ["Pull Lerver"] = true
-        },
-        ["Sword"] = {
-            ["Dual-Headed Blade"] = false,
-            ["Smoke Admiral"] = false,
-            ["Wardens Sword"] = false,
-            ["Cutlass"] = false,
-            ["Katana"] = false,
-            ["Dual Katana"] = false,
-            ["Triple Katana"] = false,
-            ["Iron Mace"] = false,
-            ["Saber"] = true,
-            ["Pole (1st Form)"] = false,
-            ["Gravity Blade"] = true,
-            ["Longsword"] = false,
-            ["Rengoku"] = false,
-            ["Midnight Blade"] = false,
-            ["Soul Cane"] = false,
-            ["Bisento"] = false,
-            ["Yama"] = true,
-            ["Tushita"] = true,
-            ["Cursed Dual Katana"] = true
-        },
-        ["Gun"] = {
-            ["Skull Guitar"] = true,
-            ["Kabucha"] = true,
-            ["Venom Bow"] = true,
-            ["Musket"] = true,
-            ["Flintlock"] = true,
-            ["Refined Slingshot"] = true,
-            ["Magma Blaster"] = true,
-            ["Dual Flintlock"] = true,
-            ["Cannon"] = true,
-            ["Bizarre Revolver"] = true,
-            ["Bazooka"] = true
-        },
-        ["Webhook"] = {
-            ["Enabled"] = true,
-            ["WebhookUrl"] = "https://discord.com/api/webhooks/1459161372100137036/RQjPgytoAOhx3HX6nmdNyLPP8UXXFwklZIsJ0sg4McrpXPmfIh7hH_La_tCSO-Ba-B9o",
-            ["Ping Mode"] = "Role", -- Everyone / Here / User / Role / None
-            ["Ping Id"] = "1459162021260955744", -- Set none if you're using everyone/none
-        },
-        ["FPS Booster"] = true
-    }
-end
-
-repeat
-    if not game.Players.LocalPlayer.Team then
-        pcall(function()
-            if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Main (minimal)")["ChooseTeam"].Container.Marines.Frame:WaitForChild("TextButton").Visible and game:GetService("Players").LocalPlayer.PlayerGui:WaitForChild("Main (minimal)")["ChooseTeam"].Container.Marines.Frame:WaitForChild("TextButton").Active then
-                game:GetService("GuiService").SelectedObject = game:GetService("Players").LocalPlayer.PlayerGui:WaitForChild("Main (minimal)").ChooseTeam.Container.Marines.Frame:WaitForChild("TextButton")
-                task.wait(0.000000000000001)
-                game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-                task.wait(0.000000000000001)
-                game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-                task.wait(0.000000000000001)
-                game:GetService("GuiService").SelectedObject = nil
-            end
-        end)
-    end
-until game.Players.LocalPlayer.Team ~= nil
-task.wait(0.5)
-local TimeHop = getgenv().SettingFarm["HOP Delay"]["Delay"]
-getgenv().TimeHop = TimeHop
-local TimeHopServer = TimeHop
-
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 
-local raceMap = {
-    ["The Unleashed"] = {Race = "Human", Version = 2},
-    ["Full Power"] = {Race = "Human", Version = 3},
-    ["His Majesty"] = {Race = "Human", Version = 4},
+local lp = Players.LocalPlayer
 
-    ["Unmatched Speed"] = {Race = "Rabbit", Version = 2},
-    ["Godspeed"] = {Race = "Rabbit", Version = 3},
-    ["Thunderbolt"] = {Race = "Rabbit", Version = 4},
+print("[Main] Bắt đầu Tiro Kaitun Modulo v2.2...")
+timeee = os.time()
+local W_angle = 30
+local lastChange = tick()
 
-    ["Sea Monster"] = {Race = "Fishman", Version = 2},
-    ["Warrior of the Sea"] = {Race = "Fishman", Version = 3},
-    ["Leviathan"] = {Race = "Fishman", Version = 4},
+-- ============================================================
+-- [ADDED] CHỌN VŨ KHÍ (TỪ T-REX HUB)
+-- ============================================================
+_G.ChooseWP = "Melee"  -- Mặc định Melee (có thể đổi thành Sword, Gun, Blox Fruit)
+_G.SelectWeapon = nil
 
-    ["Sacred Warrior"] = {Race = "Angel", Version = 2},
-    ["Perfect Being"] = {Race = "Angel", Version = 3},
-    ["His Majesty"] = {Race = "Angel", Version = 4},
-
-    ["The Ghoul"] = {Race = "Ghoul", Version = 2},
-    ["Hell Hound"] = {Race = "Ghoul", Version = 3},
-    ["Nightwalker"] = {Race = "Ghoul", Version = 4},
-
-    ["The Cyborg"] = {Race = "Cyborg", Version = 2},
-    ["War Machine"] = {Race = "Cyborg", Version = 3},
-    ["Genesis"] = {Race = "Cyborg", Version = 4},
-
-    ["Elder Wyrm"] = {Race = "Draco", Version = 2},
-    ["Ancient Flame"] = {Race = "Draco", Version = 3},
-    ["Primordial Guardian"] = {Race = "Draco", Version = 4}
-}
-
--- Hàm lấy phiên bản race cao nhất
-local function GetRaceVersion()
-    local currentRace = player.Data.Race.Value
-    local baseRace = string.gsub(currentRace, "%s+%(.+%)", "")
-    
-    local success, titles = pcall(function()
-        return game.ReplicatedStorage.Remotes.CommF_:InvokeServer("getTitles")
-    end)
-    
-    local maxVersion = 1
-    
-    -- Kiểm tra nếu lấy titles thành công và là bảng
-    if success and typeof(titles) == "table" then
-        for _, t in pairs(titles) do
-            if typeof(t) == "table" and t.Name then
-                local raceData = raceMap[t.Name]
-                if raceData and raceData.Race == baseRace then
-                    if raceData.Version > maxVersion then
-                        maxVersion = raceData.Version
+-- Luồng tự động cập nhật vũ khí
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if not bp then return end
+            if _G.ChooseWP == "Melee" then
+                for _, v in pairs(bp:GetChildren()) do
+                    if v:IsA("Tool") and v.ToolTip == "Melee" then
+                        _G.SelectWeapon = v.Name
+                        break
                     end
                 end
-            end
-        end
-    else
-    end
-    
-    return baseRace, maxVersion
-end
-
-local fruit_collected = {}
-
-local function GetInventoryItems()
-    local success, inventoryData = pcall(function()
-        return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
-    end)
-    
-    if not success or typeof(inventoryData) ~= "table" then
-        return "None"
-    end
-    
-    local itemsList = {}
-    
-    for _, v in pairs(inventoryData) do
-        if typeof(v) == "table" and v.Name then
-            table.insert(itemsList, v.Name)
-        end
-    end
-    
-    -- Sắp xếp theo alphabet
-    table.sort(itemsList)
-    
-    -- Giới hạn hiển thị (tối đa 15 items để không quá dài)
-    local maxItems = 15
-    local totalItems = #itemsList
-    local displayedItems = {}
-    
-    if totalItems > maxItems then
-        for i = 1, maxItems do
-            table.insert(displayedItems, itemsList[i])
-        end
-        displayedItems[maxItems] = displayedItems[maxItems]
-    else
-        displayedItems = itemsList
-    end
-    
-    -- Format thành chuỗi
-    local formattedText = ""
-    if #displayedItems > 0 then
-        for i, itemName in ipairs(displayedItems) do
-            if i == #displayedItems then
-                formattedText = formattedText .. itemName
-            else
-                formattedText = formattedText .. itemName .. ",\n"
-            end
-        end
-    else
-        formattedText =  "None"
-    end
-    
-    return formattedText, totalItems
-end
-
--- Hàm lấy fruit và mastery
-local function GetFruitInfo()
-    local fruitList = {
-        "Rocket-Rocket", "Spin-Spin", "Blade-Blade", "Spring-Spring", "Bomb-Bomb", 
-        "Smoke-Smoke", "Spike-Spike", "Flame-Flame", "Ice-Ice", "Sand-Sand", 
-        "Dark-Dark", "Eagle-Eagle", "Diamond-Diamond", "Light-Light", "Rubber-Rubber", 
-        "Ghost-Ghost", "Magma-Magma", "Quake-Quake", "Buddha-Buddha", "Love-Love", 
-        "Creation-Creation", "Spider-Spider", "Sound-Sound", "Phoenix-Phoenix", 
-        "Portal-Portal", "Lightning-Lightning", "Pain-Pain", "Blizzard-Blizzard", 
-        "Gravity-Gravity", "Mammoth-Mammoth", "T-Rex-T-Rex", "Dough-Dough", 
-        "Shadow-Shadow", "Venom-Venom", "Gas-Gas", "Spirit-Spirit", "Tiger-Tiger", 
-        "Yeti-Yeti", "Kitsune-Kitsune", "Control-Control", "Dragon-Dragon"
-    }
-    
-    -- Kiểm tra trong Backpack
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, fruitName in ipairs(fruitList) do
-            local fruit = backpack:FindFirstChild(fruitName)
-            if fruit then
-                local level = fruit:FindFirstChild("Level")
-                if level then
-                    local fruitSimpleName = fruitName:gsub("%-.*", "") -- Lấy phần tên trước dấu -
-                    return fruitSimpleName .. " [" .. tostring(level.Value) .. "]"
-                end
-            end
-        end
-    end
-    
-    -- Kiểm tra trong Character
-    local character = player.Character
-    if character then
-        for _, fruitName in ipairs(fruitList) do
-            local fruit = character:FindFirstChild(fruitName)
-            if fruit then
-                local level = fruit:FindFirstChild("Level")
-                if level then
-                    local fruitSimpleName = fruitName:gsub("%-.*", "") -- Lấy phần tên trước dấu -
-                    return fruitSimpleName .. " [" .. tostring(level.Value) .. "]"
-                end
-            end
-        end
-    end
-    
-    return  "None"
-end
-
-local function GetOwnedMelee()
-    local meleeList = {}
-    local meleeChecks = {
-        {cmd = "BuyBlackLeg", name = "Dark Step"},
-        {cmd = "BuyFishmanKarate", name = "Fishman Karate"},
-        {cmd = "BuyElectro", name = "Electro"},
-        {name = "Dragon Breath", type = "dragonclaw"}, -- Thay đổi ở đây
-        {cmd = "BuyDeathStep", name = "Death Step"},
-        {cmd = "BuySharkmanKarate", name = "Sharkman Karate"},
-        {cmd = "BuyElectricClaw", name = "Electric Claw"},
-        {cmd = "BuyDragonTalon", name = "Dragon Talon"},
-        {cmd = "BuySuperHuman", name = "Superhuman"},
-        {cmd = "BuyGodhuman", name = "Godhuman"},
-        {cmd = "BuySanguineArt", name = "Sanguine Art"}
-    }
-    
-    for _, melee in ipairs(meleeChecks) do
-        local hasMelee = false
-        
-        if melee.type == "dragonclaw" then
-            -- Kiểm tra Dragon Claw cấp 1 và 2
-            local success1, result1 = pcall(function()
-                return game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward", "DragonClaw", "1")
-            end)
-            
-            local success2, result2 = pcall(function()
-                return game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward", "DragonClaw", "2")
-            end)
-            
-            if (success1 and (result1 == 1 or result1 == 2)) or 
-               (success2 and (result2 == 1 or result2 == 2)) then
-                hasMelee = true
-            end
-        else
-            -- Kiểm tra các melee bình thường khác
-            local success, result = pcall(function()
-                return game.ReplicatedStorage.Remotes.CommF_:InvokeServer(melee.cmd, true)
-            end)
-            
-            if success and (result == 1 or result == 2) then
-                hasMelee = true
-            end
-        end
-        
-        if hasMelee then
-            table.insert(meleeList, melee.name)
-        end
-        task.wait(0.1) -- Tránh spam server
-    end
-    
-    -- Format danh sách melee
-    if #meleeList == 0 then
-        return "None```"
-    else
-        local formattedList = ""
-        for i, meleeName in ipairs(meleeList) do
-            if i == #meleeList then
-                formattedList = formattedList .. meleeName
-            else
-                formattedList = formattedList .. meleeName .. ",\n"
-            end
-        end
-        return formattedList
-    end
-end
-
-if getgenv().SettingFarm["Webhook"]["Enabled"] then
-    -- Send Webhook
-    local function SendWebhook(statusfarmwebhook)
-        local statusfarming = statusfarmwebhook or "```\nNone\n```"
-        if not getgenv().SettingFarm["Webhook"]["Enabled"] then return end
-        
-        -- Lấy thông tin Race
-        local raceName, raceVersion = GetRaceVersion()
-        local raceText = raceName .. " [V" .. raceVersion .. "]"
-        
-        -- Lấy thông tin Fruit
-        local fruitInfo, currentFruitName = GetFruitInfo()
-        
-        -- Lấy danh sách melee đã sở hữu
-        local meleeInfo = GetOwnedMelee()
-        
-        -- Lấy danh sách fruit collected
-        local fruitCollectedText = ""
-        if #fruit_collected > 0 then
-            for i, fruitName in ipairs(fruit_collected) do
-                if i == #fruit_collected then
-                    fruitCollectedText = fruitCollectedText .. fruitName
-                else
-                    fruitCollectedText = fruitCollectedText .. fruitName .. ",\n"
-                end
-            end
-        else
-            fruitCollectedText = "None"
-        end
-        
-        -- Lấy danh sách items từ inventory
-        local inventoryText = GetInventoryItems()
-    
-        local pingContent = ""
-        local pingMode = getgenv().SettingFarm["Webhook"]["Ping Mode"]
-        local pingId = getgenv().SettingFarm["Webhook"]["Ping Id"]
-        
-        if pingMode == "Everyone" then
-            pingContent = "@everyone"
-        elseif pingMode == "Here" then
-            pingContent = "@here"
-        elseif pingMode == "User" and pingId ~= "" then
-            pingContent = "<@" .. pingId .. ">"
-        elseif pingMode == "Role" and pingId ~= "" then
-            pingContent = "<@&" .. pingId .. ">"
-        end
-        
-        -- Tạo dữ liệu cho webhook
-        local Data = {
-            ["content"] = pingContent,
-            ["embeds"] = {{
-                ["title"] = "Lonely Hub Notification",
-                ["username"] = "Lonely Hub",
-                ["avatar_url"] = "https://i.imgur.com/ezB0Y2J.png",
-                ["color"] = tonumber("0xFF0000"),
-                ["fields"] = {
-                    {
-                        ["name"] = "**Status Farm**",
-                        ["value"] = "```\n" .. statusfarming .. "\n```",
-                        ["inline"] = false
-                    },
-                    {
-                        ["name"] = "**Main Status**",
-                        ["value"] = "```\nUsername : " .. player.Name .. 
-                                    ",\nLevel : " .. tostring(player.Data.Level.Value) .. 
-                                    ",\nRace : " .. raceText .. 
-                                    ",\nFruit : " .. fruitInfo .. "\n```",
-                        ["inline"] = false
-                    },
-                    {
-                        ["name"] = "**Fruit Collected**",
-                        ["value"] = "```\n" .. fruitCollectedText .. "\n```",
-                        ["inline"] = true
-                    },
-                    {
-                        ["name"] = "**Melee**",
-                        ["value"] = "```\n" .. meleeInfo .. "\n```",
-                        ["inline"] = true
-                    },
-                    {
-                        ["name"] = "**Inventory**",
-                        ["value"] = "```\n" .. inventoryText .. "\n```",
-                        ["inline"] = false
-                    }
-                },
-                ["footer"] = {
-                    ["text"] = "discord.gg/dBmXyaJhuK"
-                },
-                ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
-            }}
-        }
-        
-        -- Encode dữ liệu
-        local success, encoded = pcall(function()
-            return HttpService:JSONEncode(Data)
-        end)
-        
-        if not success then
-            return
-        end
-        
-        -- Gửi request
-        local Request = http_request or request or HttpPost or syn.request
-        if Request then
-            local response = Request({
-                Url = getgenv().SettingFarm["Webhook"]["WebhookUrl"],
-                Body = encoded,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"}
-            })
-        end
-    end
-else
-    local function SendWebhook(lslepdlw0eo)
-        print(lslepdlw0eo)
-    end
-end
-
-if getgenv().SettingFarm["White Screen"] then
-    game:GetService("RunService"):Set3dRenderingEnabled(false)
-end
-
-if getgenv().SettingFarm["Black Screen"] then
-    pcall(function()
-        if not PlayerGui:FindFirstChild("AFKBlackScreen") then
-            local blackScreen = Instance.new("ScreenGui")
-            blackScreen.Name = "AFKBlackScreen"
-            blackScreen.IgnoreGuiInset = true
-            blackScreen.Parent = CoreGui
-            blackScreen.ResetOnSpawn = false
-
-            local blackFrame = Instance.new("Frame")
-            blackFrame.Size = UDim2.new(1,0,1,0)
-            blackFrame.Position = UDim2.new(0,0,0,0)
-            blackFrame.BackgroundColor3 = Color3.new(0,0,0)
-            blackFrame.BorderSizePixel = 0
-            blackFrame.Parent = blackScreen
-        end
-
-        RunService:Set3dRenderingEnabled(false)
-    end)
-end
-
-if getgenv().SettingFarm["Lock Fps"]["Enabled"] then
-    pcall(function()
-        setfpscap(getgenv().SettingFarm["Lock Fps"]["FPS"])
-    end)
-end
-
-if getgenv().SettingFarm["Auto Chat"]["Enabled"] == true then
-    local TextChatService = game:GetService("TextChatService")
-    task.spawn(function()
-        repeat task.wait() until getgenv().SettingFarm
-        repeat task.wait() until getgenv().SettingFarm["Auto Chat"]
-    
-        if getgenv().AutoChatRunning then return end
-        getgenv().AutoChatRunning = true
-    
-        local index = 1
-    
-        while true do
-            if not getgenv().SettingFarm["Auto Chat"]["Enabled"] then
-                task.wait(1)
-                continue
-            end
-    
-            local text = getgenv().SettingFarm["Auto Chat"]["Text"]
-            pcall(function()
-                if typeof(text) == "table" then
-                    if #text > 0 then
-                        TextChatService.TextChannels.RBXGeneral:SendAsync(text[index])
-                        index += 1
-                        if index > #text then
-                            index = 1 -- quay vòng
-                        end
+            elseif _G.ChooseWP == "Sword" then
+                for _, v in pairs(bp:GetChildren()) do
+                    if v:IsA("Tool") and v.ToolTip == "Sword" then
+                        _G.SelectWeapon = v.Name
+                        break
                     end
-                elseif typeof(text) == "string" then
-                    TextChatService.TextChannels.RBXGeneral:SendAsync(text)
                 end
-            end)
-    
-            task.wait(150)
-        end
-    end)
-end
-
-local SUBMERGED_POS = Vector3.new(11520.8, 0, 9829.5)
-
-local function IsInSubmerged()
-    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local p = Vector3.new(hrp.Position.X, 0, hrp.Position.Z)
-    return (p - SUBMERGED_POS).Magnitude < 2000
-end
-
-local Runtime = {}
-TableConcat = table["concat"]
-if not game:IsLoaded() then
-	repeat
-		game["Loaded"]:Wait()
-	until game:IsLoaded()
-end;
-do
-    local newConfig = getgenv().SettingFarm
-    local oldConfig = {
-        ["Quest"] = {
-            ["Evo Race V1"] = newConfig["Quest"]["Evo Race V1"],
-            ["Evo Race V2"] = newConfig["Quest"]["Evo Race V2"],
-            ["RGB Haki"] = newConfig["Quest"]["RGB Haki"],
-            ["Pull Lerver"] = newConfig["Quest"]["Pull Lerver"]
-        },
-        ["Sword"] = {},
-        ["Gun"] = {},
-        ["FPS Booster"] = newConfig["FPS Booster"]
-    }
-    
-    if newConfig["Sword"]["Dual-Headed Blade"] then table.insert(oldConfig["Sword"], "Dual-Headed Blade") end
-    if newConfig["Sword"]["Smoke Admiral"] then table.insert(oldConfig["Sword"], "Smoke Admiral") end
-    if newConfig["Sword"]["Wardens Sword"] then table.insert(oldConfig["Sword"], "Wardens Sword") end
-    if newConfig["Sword"]["Cutlass"] then table.insert(oldConfig["Sword"], "Cutlass") end
-    if newConfig["Sword"]["Katana"] then table.insert(oldConfig["Sword"], "Katana") end
-    if newConfig["Sword"]["Dual Katana"] then table.insert(oldConfig["Sword"], "Dual Katana") end
-    if newConfig["Sword"]["Triple Katana"] then table.insert(oldConfig["Sword"], "Triple Katana") end
-    if newConfig["Sword"]["Iron Mace"] then table.insert(oldConfig["Sword"], "Iron Mace") end
-    if newConfig["Sword"]["Saber"] then table.insert(oldConfig["Sword"], "Saber") end
-    if newConfig["Sword"]["Pole (1st Form)"] then table.insert(oldConfig["Sword"], "Pole (1st Form)") end
-    if newConfig["Sword"]["Gravity Blade"] then table.insert(oldConfig["Sword"], "Gravity Blade") end
-    if newConfig["Sword"]["Longsword"] then table.insert(oldConfig["Sword"], "Longsword") end
-    if newConfig["Sword"]["Rengoku"] then table.insert(oldConfig["Sword"], "Rengoku") end
-    if newConfig["Sword"]["Midnight Blade"] then table.insert(oldConfig["Sword"], "Midnight Blade") end
-    if newConfig["Sword"]["Soul Cane"] then table.insert(oldConfig["Sword"], "Soul Cane") end
-    if newConfig["Sword"]["Bisento"] then table.insert(oldConfig["Sword"], "Bisento") end
-    if newConfig["Sword"]["Yama"] then table.insert(oldConfig["Sword"], "Yama") end
-    if newConfig["Sword"]["Tushita"] then table.insert(oldConfig["Sword"], "Tushita") end
-    if newConfig["Sword"]["Cursed Dual Katana"] then table.insert(oldConfig["Sword"], "Cursed Dual Katana") end
-    
-    if newConfig["Gun"]["Skull Guitar"] then table.insert(oldConfig["Gun"], "Soul Guitar") end
-    if newConfig["Gun"]["Kabucha"] then table.insert(oldConfig["Gun"], "Kabucha") end
-    if newConfig["Gun"]["Venom Bow"] then table.insert(oldConfig["Gun"], "Venom Bow") end
-    if newConfig["Gun"]["Musket"] then table.insert(oldConfig["Gun"], "Musket") end
-    if newConfig["Gun"]["Flintlock"] then table.insert(oldConfig["Gun"], "Flintlock") end
-    if newConfig["Gun"]["Refined Slingshot"] then table.insert(oldConfig["Gun"], "Refined Slingshot") end
-    if newConfig["Gun"]["Magma Blaster"] then table.insert(oldConfig["Gun"], "Magma Blaster") end
-    if newConfig["Gun"]["Dual Flintlock"] then table.insert(oldConfig["Gun"], "Dual Flintlock") end
-    if newConfig["Gun"]["Cannon"] then table.insert(oldConfig["Gun"], "Cannon") end
-    if newConfig["Gun"]["Bizarre Revolver"] then table.insert(oldConfig["Gun"], "Bizarre Revolver") end
-    if newConfig["Gun"]["Bazooka"] then table.insert(oldConfig["Gun"], "Bazooka") end
-    
-    getgenv().Configs = oldConfig
-end
-
-local targetPlayers = {
-    ["red_game43"] = true,
-    ["rip_indra"] = true,
-    ["Axiore"] = true,
-    ["Polkster"] = true,
-    ["wenlocktoad"] = true,
-    ["Daigrock"] = true,
-    ["toilamvidamme"] = true,
-    ["oofficialnoobie"] = true,
-    ["Uzoth"] = true,
-    ["Azarth"] = true,
-    ["arlthmetic"] = true,
-    ["Death_King"] = true,
-    ["Lunoven"] = true,
-    ["TheGreateAced"] = true,
-    ["rip_fud"] = true,
-    ["drip_mama"] = true,
-    ["layandikit12"] = true,
-    ["Hingoi"] = true
-}
-spawn(function()
-    while true do
-        task.wait(1)
-        for _, v in pairs(game.Players:GetPlayers()) do
-            if targetPlayers[v.Name] then
-                Hop()
-                break
-            end
-        end
-    end
-end)
-
-local function Hop()
-        require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-        task.wait(TimeHopServer)
-        require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-            local AllIDs = {}
-        local foundAnything = ""
-        local actualHour = os.date("!*t").hour
-        
-        function TPReturner()
-            local Site
-            if foundAnything == "" then
-                Site = game.HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. game.PlaceId .. '/servers/Public?sortOrder=Asc&limit=100'))
-            else
-                Site = game.HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. game.PlaceId .. '/servers/Public?sortOrder=Asc&limit=100&cursor=' .. foundAnything))
-            end
-            
-            if Site.nextPageCursor and Site.nextPageCursor ~= "null" and Site.nextPageCursor ~= nil then
-                foundAnything = Site.nextPageCursor
-            end
-            
-            local num = 0
-            for i,v in pairs(Site.data) do
-                local Possible = true
-                local ID = tostring(v.id)
-                
-                if tonumber(v.maxPlayers) > tonumber(v.playing) then
-                    for _,Existing in pairs(AllIDs) do
-                        if num ~= 0 then
-                            if ID == tostring(Existing) then
-                                Possible = false
-                            end
-                        else
-                            if tonumber(actualHour) ~= tonumber(Existing) then
-                                pcall(function()
-                                    AllIDs = {}
-                                    table.insert(AllIDs, actualHour)
-                                end)
-                            end
-                        end
-                        num = num + 1
+            elseif _G.ChooseWP == "Gun" then
+                for _, v in pairs(bp:GetChildren()) do
+                    if v:IsA("Tool") and v.ToolTip == "Gun" then
+                        _G.SelectWeapon = v.Name
+                        break
                     end
-                    
-                    if Possible == true then
-                        table.insert(AllIDs, ID)
-                        
-                        pcall(function()
-                            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, ID, game.Players.LocalPlayer)
-                        end)
-                        wait(1)
+                end
+            elseif _G.ChooseWP == "Blox Fruit" then
+                for _, v in pairs(bp:GetChildren()) do
+                    if v:IsA("Tool") and v.ToolTip == "Blox Fruit" then
+                        _G.SelectWeapon = v.Name
                         break
                     end
                 end
             end
-        end
-        
-        while true do
+        end)
+    end
+end)
+
+-- ============================================================
+-- [ADDED] GAME DATA (từ data_lua.txt) — bảng tham chiếu thuần
+-- KHÔNG wire vào đâu trực tiếp; dùng khi cần tra level→mob/quest
+-- ============================================================
+local GameData = {
+	QUESTS = {
+		Sea_1 = {
+			{1, 9, "Team-dependent", "Team-dependent", 1},
+			{10, 14, "Monkey", "JungleQuest", 1},
+			{15, 29, "Gorilla", "JungleQuest", 2, "The Gorilla King", 20},
+			{30, 39, "Pirate", "BuggyQuest1", 1},
+			{40, 59, "Brute", "BuggyQuest1", 2, "Chief", 55},
+			{60, 74, "Desert Bandit", "DesertQuest", 1},
+			{75, 89, "Desert Officer", "DesertQuest", 2},
+			{90, 99, "Snow Bandit", "SnowQuest", 1},
+			{100, 119, "Snowman", "SnowQuest", 2, "Yeti", 105},
+			{120, 149, "Chief Petty Officer", "MarineQuest2", 1, "Vice Admiral", 130},
+			{150, 174, "Sky Bandit", "SkyQuest", 1},
+			{175, 189, "Dark Master", "SkyQuest", 2},
+			{190, 209, "Prisoner", "PrisonerQuest", 1},
+			{210, 249, "Dangerous Prisoner", "PrisonerQuest", 2, {"Warden", 220, "ImpelQuest", 1}, {"Chief Warden", 230, "ImpelQuest", 2}, {"Swan", 240, "ImpelQuest", 3}},
+			{250, 274, "Toga Warrior", "ColosseumQuest", 1},
+			{275, 299, "Gladiator", "ColosseumQuest", 2},
+			{300, 324, "Military Soldier", "MagmaQuest", 1},
+			{325, 374, "Military Spy", "MagmaQuest", 2, "Magma Admiral", 350},
+			{375, 399, "Fishman Warrior", "FishmanQuest", 1},
+			{400, 449, "Fishman Commando", "FishmanQuest", 2, "Fishman Lord", 425},
+			{450, 474, "God's Guard", "SkyExp1Quest", 1},
+			{475, 524, "Shanda", "SkyExp1Quest", 2, "Wysper", 500},
+			{525, 549, "Royal Squad", "SkyExp2Quest", 1},
+			{550, 624, "Royal Soldier", "SkyExp2Quest", 2, "Thunder God", 575},
+			{625, 649, "Galley Pirate", "FountainQuest", 1},
+			{650, 9999, "Galley Captain", "FountainQuest", 2, "Cyborg", 675},
+		},
+		Sea_2 = {
+			{700, 724, "Raider", "Area1Quest", 1},
+			{725, 774, "Mercenary", "Area1Quest", 2, "Diamond", 750},
+			{775, 799, "Swan Pirate", "Area2Quest", 1},
+			{800, 874, "Factory Staff", "Area2Quest", 2, "Jeremy", 850},
+			{875, 899, "Marine Lieutenant", "MarineQuest3", 1},
+			{900, 949, "Marine Captain", "MarineQuest3", 2, "Orbitus", 925},
+			{950, 974, "Zombie", "ZombieQuest", 1},
+			{975, 999, "Vampire", "ZombieQuest", 2},
+			{1000, 1049, "Snow Trooper", "SnowMountainQuest", 1},
+			{1050, 1099, "Winter Warrior", "SnowMountainQuest", 2},
+			{1100, 1124, "Lab Subordinate", "IceSideQuest", 1},
+			{1125, 1174, "Horned Warrior", "IceSideQuest", 2, "Smoke Admiral", 1150},
+			{1175, 1199, "Magma Ninja", "FireSideQuest", 1},
+			{1200, 1249, "Lava Pirate", "FireSideQuest", 2},
+			{1250, 1274, "Ship Deckhand", "ShipQuest1", 1},
+			{1275, 1299, "Ship Engineer", "ShipQuest1", 2},
+			{1300, 1324, "Ship Steward", "ShipQuest2", 1},
+			{1325, 1349, "Ship Officer", "ShipQuest2", 2},
+			{1350, 1374, "Arctic Warrior", "FrostQuest", 1},
+			{1375, 1424, "Snow Lurker", "FrostQuest", 2, "Awakened Ice Admiral", 1400},
+			{1425, 1449, "Sea Soldier", "ForgottenQuest", 1},
+			{1450, 9999, "Water Fighter", "ForgottenQuest", 2, "Tide Keeper", 1475},
+		},
+		Sea_3 = {
+			{1500, 1524, "Pirate Millionaire", "PiratePortQuest", 1},
+			{1525, 1574, "Pistol Billionaire", "PiratePortQuest", 2},
+			{1575, 1599, "Dragon Crew Warrior", "DragonCrewQuest", 1},
+			{1600, 1624, "Dragon Crew Archer", "DragonCrewQuest", 2},
+			{1625, 1649, "Hydra Enforcer", "VenomCrewQuest", 1},
+			{1650, 1699, "Venomous Assailant", "VenomCrewQuest", 2},
+			{1700, 1724, "Marine Commodore", "MarineTreeIsland", 1},
+			{1725, 1774, "Marine Rear Admiral", "MarineTreeIsland", 2},
+			{1775, 1799, "Fishman Raider", "DeepForestIsland3", 1},
+			{1800, 1824, "Fishman Captain", "DeepForestIsland3", 2},
+			{1825, 1849, "Forest Pirate", "DeepForestIsland", 1},
+			{1850, 1899, "Mythological Pirate", "DeepForestIsland", 2},
+			{1900, 1924, "Jungle Pirate", "DeepForestIsland2", 1},
+			{1925, 1974, "Musketeer Pirate", "DeepForestIsland2", 2},
+			{1975, 1999, "Reborn Skeleton", "HauntedQuest1", 1},
+			{2000, 2024, "Living Zombie", "HauntedQuest1", 2},
+			{2025, 2049, "Demonic Soul", "HauntedQuest2", 1},
+			{2050, 2074, "Posessed Mummy", "HauntedQuest2", 2},
+			{2075, 2099, "Peanut Scout", "NutsIslandQuest", 1},
+			{2100, 2124, "Peanut President", "NutsIslandQuest", 2},
+			{2125, 2149, "Ice Cream Chef", "IceCreamIslandQuest", 1},
+			{2150, 2199, "Ice Cream Commander", "IceCreamIslandQuest", 2},
+			{2200, 2224, "Cookie Crafter", "CakeQuest1", 1},
+			{2225, 2249, "Cake Guard", "CakeQuest1", 2},
+			{2250, 2274, "Baking Staff", "CakeQuest2", 1},
+			{2275, 2299, "Head Baker", "CakeQuest2", 2},
+			{2300, 2324, "Cocoa Warrior", "ChocQuest1", 1},
+			{2325, 2349, "Chocolate Bar Battler", "ChocQuest1", 2},
+			{2350, 2374, "Sweet Thief", "ChocQuest2", 1},
+			{2375, 2399, "Candy Rebel", "ChocQuest2", 2},
+			{2400, 2424, "Candy Pirate", "CandyQuest1", 1},
+			{2425, 2449, "Snow Demon", "CandyQuest1", 2},
+			{2450, 2474, "Isle Outlaw", "TikiQuest1", 1},
+			{2475, 2499, "Island Boy", "TikiQuest1", 2},
+			{2500, 2524, "Sun-kissed Warrior", "TikiQuest2", 1},
+			{2525, 2549, "Isle Champion", "TikiQuest2", 2},
+			{2550, 2574, "Serpent Hunter", "TikiQuest3", 1},
+			{2575, 2599, "Skull Slayer", "TikiQuest3", 2},
+			{2600, 2624, "Reef Bandit", "SubmergedQuest1", 1},
+			{2625, 2649, "Coral Pirate", "SubmergedQuest1", 2},
+			{2650, 2674, "Sea Chanter", "SubmergedQuest2", 1},
+			{2675, 2699, "High Disciple", "SubmergedQuest3", 1},
+			{2700, 9999, "Grand Devotee", "SubmergedQuest3", 2},
+		}
+	},
+	BossList = {
+		Sea_1 = {
+			{20, "The Gorilla King", "JungleQuest", 3, CFrame.new(-1602, 37, 153)},
+			{55, "Chief", "BuggyQuest1", 2, CFrame.new(-1140, 5, 3827)},
+			{105, "Yeti", "SnowQuest", 3, CFrame.new(1387, 87, -1298)},
+			{130, "Vice Admiral", "MarineQuest2", 2, CFrame.new(-5036, 29, 4325)},
+			{220, "Warden", "ImpelQuest", 1, CFrame.new(5192, 3, 686)},
+			{230, "Chief Warden", "ImpelQuest", 2, CFrame.new(5192, 3, 686)},
+			{240, "Swan", "ImpelQuest", 3, CFrame.new(5192, 3, 686)},
+			{350, "Magma Admiral", "MagmaQuest", 3, CFrame.new(-5315, 12, 8517)},
+			{425, "Fishman Lord", "FishmanQuest", 3, CFrame.new(61123, 18, 1569)},
+			{500, "Wysper", "SkyExp1Quest", 3, CFrame.new(-7862, 5546, -380)},
+			{575, "Thunder God", "SkyExp2Quest", 3, CFrame.new(-7903, 5636, -1411)},
+			{675, "Cyborg", "FountainQuest", 3, CFrame.new(5258, 39, 4050)},
+		},
+		Sea_2 = {
+			{750, "Diamond", "Area1Quest", 3, CFrame.new(-428, 73, 1835)},
+			{850, "Jeremy", "Area2Quest", 3, CFrame.new(637, 73, 918)},
+			{925, "Orbitus", "MarineQuest3", 3, CFrame.new(-2442, 73, -3218)},
+			{1150, "Smoke Admiral", "IceSideQuest", 3, CFrame.new(-5429, 16, -5298)},
+			{1400, "Awakened Ice Admiral", "FrostQuest", 3, CFrame.new(5669, 29, -6483)},
+			{1475, "Tide Keeper", "ForgottenQuest", 3, CFrame.new(-3054, 237, -10145)},
+		},
+		Sea_3 = {
+			{1575, "Stone", "PiratePortQuest", 3, CFrame.new(-290, 44, 5580)},
+			{1775, "Kilo Admiral", "MarineTreeIsland", 3, CFrame.new(2179, 29, -6740)},
+			{1875, "Captain Elephant", "DeepForestIsland", 3, CFrame.new(-13233, 332, -7626)},
+			{1950, "Beautiful Pirate", "DeepForestIsland2", 3, CFrame.new(-12682, 391, -9902)},
+			{2175, "Cake Queen", "IceCreamIslandQuest", 3, CFrame.new(-819, 65, -10967)},
+		}
+	},
+	MaterialEnemies = {
+		Sea_1 = {
+			["Angel Wings"] = { "Shanda", "Royal Squad", "Royal Soldier", "Wysper", "Thunder God" },
+			["Leather + Scrap Metal"] = { "Brute", "Pirate" },
+			["Magma Ore"] = { "Military Soldier", "Military Spy", "Magma Admiral" },
+			["Fish Tail"] = { "Fishman Warrior", "Fishman Commando", "Fishman Lord" },
+		},
+		Sea_2 = {
+			["Leather + Scrap Metal"] = { "Marine Captain" },
+			["Magma Ore"] = { "Magma Ninja", "Lava Pirate" },
+			["Ectoplasm"] = { "Ship Deckhand", "Ship Engineer", "Ship Steward", "Ship Officer" },
+			["Mystic Droplet"] = { "Water Fighter" },
+			["Radioactive Material"] = { "Factory Staff" },
+			["Vampire Fang"] = { "Vampire" },
+		},
+		Sea_3 = {
+			["Leather + Scrap Metal"] = { "Jungle Pirate" },
+			["Demonic Wisp"] = { "Demonic Soul" },
+			["Fish Tail"] = { "Fishman Raider", "Fishman Captain" },
+			["Conjured Cocoa"] = { "Chocolate Bar Battler", "Cocoa Warrior" },
+			["Dragon Scale"] = { "Dragon Crew Archer", "Dragon Crew Warrior" },
+			["Gunpowder"] = { "Pistol Billionaire" },
+			["Mini Tusk"] = { "Mythological Pirate" },
+			["Nightmare Catcher"] = { "Reborn Skeleton", "Living Zombie" },
+		}
+	},
+	Materials = {
+		Sea_1 = { "Leather + Scrap Metal", "Angel Wings", "Magma Ore", "Fish Tail" },
+		Sea_2 = { "Leather + Scrap Metal", "Radioactive Material", "Ectoplasm", "Mystic Droplet", "Magma Ore", "Vampire Fang" },
+		Sea_3 = { "Leather + Scrap Metal", "Demonic Wisp", "Conjured Cocoa", "Dragon Scale", "Gunpowder", "Fish Tail", "Mini Tusk", "Nightmare Catcher" }
+	},
+	BossNames = {
+		Sea_1 = { "The Gorilla King", "Chief", "Yeti", "Vice Admiral", "Warden", "Chief Warden", "Swan", "Magma Admiral", "Fishman Lord", "Wysper", "Thunder God", "Cyborg", "Saw" },
+		Sea_2 = { "Diamond", "Jeremy", "Orbitus", "Smoke Admiral", "Awakened Ice Admiral", "Tide Keeper", "Don Swan" },
+		Sea_3 = { "Stone", "Kilo Admiral", "Captain Elephant", "Beautiful Pirate", "Cake Queen" }
+	},
+	MeleeNames = {
+		Sea_1 = { "Black Leg", "Electro", "Fishman Karate" },
+		Sea_2 = { "Death Step", "Dragon Claw", "Sharkman Karate", "Superhuman" },
+		Sea_3 = { "Dragon Talon", "Electric Claw", "Godhuman", "Sanguine Art" }
+	},
+	Melees = {
+		["Black Leg"] = {
+			Model = "Dark Step Teacher",
+			Npc = "Dark Step Teacher",
+			npc = "Dark Step Teacher",
+			CFrame = CFrame.new(-1147.284, 4.752, 3816.326),
+			cframe = CFrame.new(-1147.284, 4.752, 3816.326),
+			Remote = { "BuyBlackLeg" },
+			remote = { "BuyBlackLeg" },
+			Sea = 1
+		},
+		["Electro"] = {
+			Model = "Mad Scientist",
+			Npc = "Mad Scientist",
+			npc = "Mad Scientist",
+			CFrame = CFrame.new(-4842.112, 717.670, -2623.149),
+			cframe = CFrame.new(-4842.112, 717.670, -2623.149),
+			Remote = { "BuyElectro" },
+			remote = { "BuyElectro" },
+			Sea = 1
+		},
+		["Fishman Karate"] = {
+			Model = "Water Kung-fu Teacher",
+			Npc = "Water Kung-fu Teacher",
+			npc = "Water Kung-fu Teacher",
+			CFrame = CFrame.new(61122.652, 18.497, 1568.351),
+			cframe = CFrame.new(61122.652, 18.497, 1568.351),
+			Remote = { "BuyFishmanKarate" },
+			remote = { "BuyFishmanKarate" },
+			Sea = 1
+		},
+		["Dragon Claw"] = {
+			Model = "Sabi",
+			Npc = "Sabi",
+			npc = "Sabi",
+			CFrame = CFrame.new(699.029, 185.661, 654.895),
+			cframe = CFrame.new(699.029, 185.661, 654.895),
+			CFrames = {
+				Sea_2 = CFrame.new(699.029, 185.661, 654.895),
+			},
+			cframes = {
+				Sea_2 = CFrame.new(699.029, 185.661, 654.895),
+			},
+			Remote = { { "BlackbeardReward", "DragonClaw", "1" }, { "BlackbeardReward", "DragonClaw", "2" } },
+			remote = { { "BlackbeardReward", "DragonClaw", "1" }, { "BlackbeardReward", "DragonClaw", "2" } },
+			Sea = 2
+		},
+		["Superhuman"] = {
+			Model = "Martial Arts Master",
+			Npc = "Martial Arts Master",
+			npc = "Martial Arts Master",
+			CFrame = CFrame.new(1377.125, 246.542, -5189.951),
+			cframe = CFrame.new(1377.125, 246.542, -5189.951),
+			CFrames = {
+				Sea_2 = CFrame.new(1377.125, 246.542, -5189.951),
+			},
+			cframes = {
+				Sea_2 = CFrame.new(1377.125, 246.542, -5189.951),
+			},
+			Remote = { "BuySuperhuman" },
+			remote = { "BuySuperhuman" },
+			Sea = 2
+		},
+		["Death Step"] = {
+			Model = "Phoeyu, the Reformed",
+			Npc = "Phoeyu, the Reformed",
+			npc = "Phoeyu, the Reformed",
+			CFrame = CFrame.new(6356.472, 296.100, -6762.771),
+			cframe = CFrame.new(6356.472, 296.100, -6762.771),
+			CFrames = {
+				Sea_2 = CFrame.new(6356.472, 296.100, -6762.771),
+			},
+			cframes = {
+				Sea_2 = CFrame.new(6356.472, 296.100, -6762.771),
+			},
+			Remote = { "BuyDeathStep" },
+			remote = { "BuyDeathStep" },
+			Sea = 2
+		},
+		["Sharkman Karate"] = {
+			Model = "Sharkman Teacher",
+			Npc = "Sharkman Teacher",
+			npc = "Sharkman Teacher",
+			CFrame = CFrame.new(-2599.622, 238.198, -10315.998),
+			cframe = CFrame.new(-2599.622, 238.198, -10315.998),
+			CFrames = {
+				Sea_2 = CFrame.new(-2599.622, 238.198, -10315.998),
+			},
+			cframes = {
+				Sea_2 = CFrame.new(-2599.622, 238.198, -10315.998),
+			},
+			Remote = { "BuySharkmanKarate" },
+			remote = { "BuySharkmanKarate" },
+			Sea = 2
+		},
+		["Electric Claw"] = {
+			Model = "Previous Hero",
+			Npc = "Previous Hero",
+			npc = "Previous Hero",
+			CFrame = CFrame.new(-10368.514, 331.788, -10134.120),
+			cframe = CFrame.new(-10368.514, 331.788, -10134.120),
+			CFrames = {
+				Sea_3 = CFrame.new(-10368.514, 331.788, -10134.120),
+			},
+			cframes = {
+				Sea_3 = CFrame.new(-10368.514, 331.788, -10134.120),
+			},
+			Remote = { "BuyElectricClaw" },
+			remote = { "BuyElectricClaw" },
+			Sea = 3
+		},
+		["Dragon Talon"] = {
+			Model = "Uzoth",
+			Npc = "Uzoth",
+			npc = "Uzoth",
+			CFrame = CFrame.new(-9515.372, 142.130, 5535.089),
+			cframe = CFrame.new(-9515.372, 142.130, 5535.089),
+			CFrames = {
+				Sea_3 = CFrame.new(-9515.372, 142.130, 5535.089),
+			},
+			cframes = {
+				Sea_3 = CFrame.new(-9515.372, 142.130, 5535.089),
+			},
+			Remote = { "BuyDragonTalon" },
+			remote = { "BuyDragonTalon" },
+			Sea = 3
+		},
+		["Godhuman"] = {
+			Model = "Ancient Monk",
+			Npc = "Ancient Monk",
+			npc = "Ancient Monk",
+			CFrame = CFrame.new(-12463.870, 374.910, -7523.770),
+			cframe = CFrame.new(-12463.870, 374.910, -7523.770),
+			CFrames = {
+				Sea_3 = CFrame.new(-12463.870, 374.910, -7523.770),
+			},
+			cframes = {
+				Sea_3 = CFrame.new(-12463.870, 374.910, -7523.770),
+			},
+			Remote = { "BuyGodhuman" },
+			remote = { "BuyGodhuman" },
+			Sea = 3
+		},
+		["Sanguine Art"] = {
+			Model = "Shafi",
+			Npc = "Shafi",
+			npc = "Shafi",
+			CFrame = CFrame.new(-16548.800, 12.000, 412.300),
+			cframe = CFrame.new(-16548.800, 12.000, 412.300),
+			CFrames = {
+				Sea_3 = CFrame.new(-16548.800, 12.000, 412.300),
+			},
+			cframes = {
+				Sea_3 = CFrame.new(-16548.800, 12.000, 412.300),
+			},
+			Remote = { { "BuySanguineArt", true }, { "BuySanguineArt" } },
+			remote = { { "BuySanguineArt", true }, { "BuySanguineArt" } },
+			Sea = 3
+		},
+	},
+	ItemsToBuy = {
+		["Frags"] = {
+			["Race Rerol"] = { "BlackbeardReward", "Reroll", "2" },
+			["Reset Stats"] = { "BlackbeardReward", "Refund", "2" }
+		},
+		["Ability"] = {
+			["Geppo"] = { "BuyHaki", "Geppo" },
+			["Buso Haki"] = { "BuyHaki", "Buso" },
+			["Soru"] = { "BuyHaki", "Soru" },
+			["Observation Haki"] = { "KenTalk", "Buy" }
+		},
+		["Gun"] = {
+			["Slingshot"] = { "BuyItem", "Slingshot" },
+			["Musket"] = { "BuyItem", "Musket" },
+			["Flintlock"] = { "BuyItem", "Flintlock" },
+			["Refined Slingshot"] = { "BuyItem", "Refined Flintlock" },
+			["Refined Flintlock"] = { "BuyItem", "Refined Flintlock" },
+			["Cannon"] = { "BuyItem", "Cannon" },
+			["Kabucha"] = { "BlackbeardReward", "Slingshot", "1" },
+			["Bizarre Rifle"] = { "Ectoplasm", "Buy", 1 }
+		},
+		["Accessory"] = {
+			["Black Cape"] = { "Black Cape" },
+			["Swordsman Hat"] = { "Swordsman Hat" },
+			["Tomoe Ring"] = { "Tomoe Ring" }
+		},
+		["Sword"] = {
+			["Cutlass"] = { "Cutlass" },
+			["Katana"] = { "Katana" },
+			["Iron Mace"] = { "Iron Mace" },
+			["Dual Katana"] = { "Duel Katana" },
+			["Triple Katana"] = { "Triple Katana" },
+			["Pipe"] = { "Pipe" },
+			["Dual-Headed Blade"] = { "Dual-Headed Blade" },
+			["Bisento"] = { "Bisento" },
+			["Soul Cane"] = { "Soul Cane" },
+			["Pole v.2"] = { "ThunderGodTalk" }
+		}
+	},
+	Islands = {
+		["Sea 1"] = {
+			["Pirate Starter"] = CFrame.new(1047, 15, 1506),
+			["Marine Starter"] = CFrame.new(-2728, 25, 2056),
+			["Middle Town"] = CFrame.new(-688, 15, 1585),
+			["Jungle"] = CFrame.new(-1614, 37, 146),
+			["Pirate Village"] = CFrame.new(-1173, 45, 3837),
+			["Desert"] = CFrame.new(944, 21, 4373),
+			["Frozen Village"] = CFrame.new(1298, 87, -1344),
+			["Marine Fortress"] = CFrame.new(-4810, 21, 4359),
+			["Colosseum"] = CFrame.new(-1535, 7, -3014),
+			["Lower Skylands"] = CFrame.new(-4814, 718, -2551),
+			["Skylands"] = CFrame.new(-4652, 873, -1754),
+			["Upper Skylands"] = CFrame.new(-7895, 5547, -380),
+			["Prison"] = CFrame.new(4870, 6, 736),
+			["Magma Village"] = CFrame.new(-5290, 9, 8349),
+			["Underwater City"] = CFrame.new(61164, 5, 1820),
+			["Fountain City"] = CFrame.new(5757, 91, 4017),
+			["Jean-Luc Island"] = CFrame.new(-2850, 7, 5355),
+		},
+		["Sea 2"] = {
+			["The Cafe"] = CFrame.new(-382, 73, 290),
+			["First Spot"] = CFrame.new(-11, 29, 2771),
+			["Dark Arena"] = CFrame.new(3494, 13, -3259),
+			["Don Swan Mansion"] = CFrame.new(-317, 331, 597),
+			["Don Swan Room"] = CFrame.new(2285, 15, 905),
+			["Green Zone"] = CFrame.new(-2258, 73, -2696),
+			["Graveyard"] = CFrame.new(-5552, 194, -776),
+			["Snow Mountain"] = CFrame.new(752, 408, -5277),
+			["Hot and Cold"] = CFrame.new(-6008, 29, -5018),
+			["Cursed Ship"] = CFrame.new(919, 125, 32869),
+			["Ice Castle"] = CFrame.new(5505, 40, -6178),
+			["Forgotten Island"] = CFrame.new(-3050, 240, -10178),
+			["Remote Island"] = CFrame.new(4816, 8, 2863),
+		},
+		["Sea 3"] = {
+			["Mansion"] = CFrame.new(-12471, 374, -7551),
+			["Port Town"] = CFrame.new(-340, 21, 5524),
+			["Great Tree"] = CFrame.new(2205, 22, -6766),
+			["Castle On The Sea"] = CFrame.new(-4980, 314, -3018),
+			["Hydra Island"] = CFrame.new(5294, 1005, 391),
+			["Floating Turtle"] = CFrame.new(-12528, 332, -8658),
+			["Haunted Castle"] = CFrame.new(-9517, 142, 5528),
+			["Ice Cream Land"] = CFrame.new(-843, 66, -10944),
+			["Peanut Land"] = CFrame.new(-2082, 38, -10190),
+			["Cake Land"] = CFrame.new(-1897, 14, -11576),
+			["Candy Cane Land"] = CFrame.new(-1094, 64, -14519),
+			["Chocolate Land"] = CFrame.new(219, 127, -12604),
+			["Tiki Outpost"] = CFrame.new(-16224, 9, 439),
+		}
+	},
+	PortalLocations = {
+		Sea_1 = {
+			Vector3.new(-7894.62, 5545.49, -380.25),
+			Vector3.new(-4607.82, 872.54, -1667.56),
+			Vector3.new(61163.85, 11.76, 1819.78),
+			Vector3.new(3876.28, 35.11, -1939.32)
+		},
+		Sea_2 = {
+			Vector3.new(-288.46, 306.13, 598),
+			Vector3.new(2284.91, 15.15, 905.48),
+			Vector3.new(923.21, 126.98, 32852.83),
+			Vector3.new(-6508.56, 89.03, -132.84)
+		},
+		Sea_3 = {
+			Vector3.new(-5058.77, 314.52, -3155.88),
+			Vector3.new(-12463.87, 374.91, -7523.77),
+			Vector3.new(28282.57, 14896.85, 105.1),
+			Vector3.new(5661.53, 1013.09, -334.96),
+			Vector3.new(5319, 23, -93),
+			Vector3.new(5651, 1018, -350),
+			Vector3.new(28286, 14897, 103)
+		}
+	},
+	SwordData = {
+		["Dark Blade"] = { Rarity = "Mythical", Order = 1 },
+		["True Triple Katana"] = { Rarity = "Mythical", Order = 1 },
+		["Cursed Dual Katana"] = { Rarity = "Mythical", Order = 1 },
+		["Hallow Scythe"] = { Rarity = "Mythical", Order = 1 },
+		["Triple Dark Blade"] = { Rarity = "Mythical", Order = 1 },
+		["Dog Blade"] = { Rarity = "Mythical", Order = 1 },
+
+		["Rengoku"] = { Rarity = "Legendary", Order = 2 },
+		["Yama"] = { Rarity = "Legendary", Order = 2 },
+		["Tushita"] = { Rarity = "Legendary", Order = 2 },
+		["Buddy Sword"] = { Rarity = "Legendary", Order = 2 },
+		["Shark Anchor"] = { Rarity = "Legendary", Order = 2 },
+		["Fox Lamp"] = { Rarity = "Legendary", Order = 2 },
+		["Dragon Trident"] = { Rarity = "Legendary", Order = 2 },
+		["Saber"] = { Rarity = "Legendary", Order = 2 },
+		["Canvander"] = { Rarity = "Legendary", Order = 2 },
+		["Dark Dagger"] = { Rarity = "Legendary", Order = 2 },
+		["Dragonheart"] = { Rarity = "Legendary", Order = 2 },
+		["Koko"] = { Rarity = "Legendary", Order = 2 },
+		["Midnight Blade"] = { Rarity = "Legendary", Order = 2 },
+		["Oroshi"] = { Rarity = "Legendary", Order = 2 },
+		["Pole (1st Form)"] = { Rarity = "Legendary", Order = 2 },
+		["Pole (2nd Form)"] = { Rarity = "Legendary", Order = 2 },
+		["Saishi"] = { Rarity = "Legendary", Order = 2 },
+		["Shizu"] = { Rarity = "Legendary", Order = 2 },
+		["Longsword"] = { Rarity = "Legendary", Order = 2 },
+		["Pipe"] = { Rarity = "Legendary", Order = 2 },
+		["Soul Cane"] = { Rarity = "Legendary", Order = 2 },
+		["Trident"] = { Rarity = "Legendary", Order = 2 },
+		["Wardens Sword"] = { Rarity = "Legendary", Order = 2 },
+		["Bisento"] = { Rarity = "Legendary", Order = 2 },
+		["Triple Katana"] = { Rarity = "Legendary", Order = 2 },
+		["Twin Hooks"] = { Rarity = "Legendary", Order = 2 },
+		["Dual-Headed Blade"] = { Rarity = "Legendary", Order = 2 },
+		["Flail"] = { Rarity = "Legendary", Order = 2 },
+		["Gravity Blade"] = { Rarity = "Legendary", Order = 2 },
+
+		["Spikey Trident"] = { Rarity = "Rare", Order = 3 },
+		["Fishing Trophy"] = { Rarity = "Rare", Order = 3 },
+		["Shark Saw"] = { Rarity = "Rare", Order = 3 },
+
+		["Iron Mace"] = { Rarity = "Uncommon", Order = 4 },
+
+		["Cutlass"] = { Rarity = "Common", Order = 5 },
+		["Katana"] = { Rarity = "Common", Order = 5 },
+		["Dual Katana"] = { Rarity = "Common", Order = 5 },
+	},
+	BoatsList = {
+		'Dinghy',
+		'PirateSloop',
+		'PirateBrigade',
+		'PirateGrandBrigade',
+		'MarineSloop',
+		'MarineBrigade',
+		'MarineGrandBrigade',
+		'Beast Hunter',
+		'Lantern',
+		'Guardian',
+		'Grand Brigade',
+		'Sloop',
+		'The Sentinel'
+	},
+	ZoneList = {
+		'Level 1',
+		'Level 2',
+		'Level 3',
+		'Level 4',
+		'Level 5',
+		'Level 6',
+		'Infinite'
+	},
+	SeaEventTargets = {
+		"Terror Shark",
+		"Sea Beast",
+		"Shark",
+		"Piranha",
+		"Fish Crew Member",
+		"Pirate Brigade",
+		"Pirate Grand Brigade",
+		"Ghost Ship"
+	},
+	RodsList = {
+		"Fishing Rod",
+		"Gold Rod",
+		"Shark Rod",
+		"Shell Rod",
+		"Treasure Rod",
+		"Shark (Corrupted)",
+		"Shell (Celestial)"
+	},
+	BaitsList = {
+		"Basic Bait",
+		"Kelp Bait",
+		"Good Bait",
+		"Abyssal Bait",
+		"Frozen Bait",
+		"Epic Bait",
+		"Carnivore Bait"
+	},
+	DungeonCards = {
+		"Hyper",
+		"Overflow",
+		"Fortress",
+		"Shadow",
+		"Sniper",
+		"Lifesteal",
+		"Unbreakable",
+		"Health",
+		"Defense",
+		"Armor",
+		"Melee",
+		"Sword",
+		"Fruit",
+		"Gun"
+	},
+	TrainMethods = {
+		"Bones",
+		"Cakes"
+	},
+	LegendarySwordNames = {
+		"Shizu",
+		"Oroshi",
+		"Saishi"
+	},
+	BossHopNames = {
+		"Greybeard",
+		"Darkbeard",
+		"Cursed Captain",
+		"rip_indra True Form",
+		"Soul Reaper",
+		"Cake Prince",
+		"Dough King",
+		"Tyrant of the Skies"
+	},
+	BossMap = {
+		["Greybeard"] = "Greybeard",
+		["Darkbeard"] = "Darkbeard",
+		["Cursed Captain"] = "CursedCaptain",
+		["rip_indra True Form"] = "Ripindra",
+		["Soul Reaper"] = "SoulReaper",
+		["Cake Prince"] = "CakePrince",
+		["Dough King"] = "DoughKing",
+		["Tyrant of the Skies"] = "Tyrant"
+	},
+	ScrollList = {
+		"Common Scroll",
+		"Rare Scroll",
+		"Legendary Scroll",
+		"Mythical Scroll"
+	},
+	ChestTiers = {
+		"Diamond",
+		"Gold",
+		"Silver"
+	},
+	IgnoreNPC = {
+		"Quest",
+		"Boat",
+		"Home"
+	},
+	DracoSequence = {
+		"Relic1",
+		"EndRelic1",
+		"Relic2",
+		"EndRelic2",
+		"Relic3",
+		"EndRelic3"
+	},
+	SwordList = {
+		"Shizu",
+		"Saishi",
+		"Oroshi"
+	},
+	DealerFruitList = {
+		"Rocket-Rocket",
+		"Spin-Spin",
+		"Blade-Blade",
+		"Spring-Spring",
+		"Bomb-Bomb",
+		"Smoke-Smoke",
+		"Spike-Spike",
+		"Flame-Flame",
+		"Ice-Ice",
+		"Sand-Sand",
+		"Dark-Dark",
+		"Eagle-Eagle",
+		"Diamond-Diamond",
+		"Light-Light",
+		"Rubber-Rubber",
+		"Ghost-Ghost",
+		"Magma-Magma",
+		"Quake-Quake",
+		"Buddha-Buddha",
+		"Love-Love",
+		"Creation-Creation",
+		"Spider-Spider",
+		"Sound-Sound",
+		"Phoenix-Phoenix",
+		"Portal-Portal",
+		"Lightning-Lightning",
+		"Pain-Pain",
+		"Blizzard-Blizzard",
+		"Gravity-Gravity",
+		"Mammoth-Mammoth",
+		"T-Rex-T-Rex",
+		"Dough-Dough",
+		"Shadow-Shadow",
+		"Venom-Venom",
+		"Gas-Gas",
+		"Spirit-Spirit",
+		"Tiger-Tiger",
+		"Yeti-Yeti",
+		"Kitsune-Kitsune",
+		"Control-Control",
+		"Dragon-Dragon"
+	}
+}
+
+function hoangtuveu()
+    local W = {Instances = {}}
+    repeat task.wait() until game.CoreGui
+
+    -- ============================================================
+    -- UI TỪ DYNAMICISLAND_AXIOM-1.LUA (CÓ DISCORD + CONTAINER)
+    -- ============================================================
+    local gui = Instance.new('ScreenGui')
+    gui.Name = "KaitunUI"
+    gui.Parent = game:GetService('CoreGui')
+    gui.Enabled = true
+    gui.ResetOnSpawn = true
+    gui.DisplayOrder = 10
+    gui.IgnoreGuiInset = false
+
+    local container = Instance.new("Frame")
+    container.Name = "Container"
+    container.Parent = gui
+    container.AnchorPoint = Vector2.new(0.5, 0)
+    container.Position = UDim2.new(0.5, 0, 0.01, 0)
+    container.AutomaticSize = Enum.AutomaticSize.XY
+    container.Size = UDim2.new(0, 0, 0, 0)
+    container.BackgroundTransparency = 1
+
+    local containerLayout = Instance.new("UIListLayout", container)
+    containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    containerLayout.Padding = UDim.new(0, 4)
+    containerLayout.FillDirection = Enum.FillDirection.Vertical
+    containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local discordLabel = Instance.new("TextLabel")
+    discordLabel.Name = "DiscordLabel"
+    discordLabel.Parent = container
+    discordLabel.LayoutOrder = 1
+    discordLabel.AutomaticSize = Enum.AutomaticSize.XY
+    discordLabel.Size = UDim2.new(0, 0, 0, 0)
+    discordLabel.BackgroundTransparency = 1
+    discordLabel.Text = "https://discord.gg/ZH7qdJMvR"
+    discordLabel.TextSize = 13
+    discordLabel.Font = Enum.Font.Highway
+    discordLabel.TextColor3 = Color3.fromRGB(0, 150, 255)
+    discordLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+    local frame = Instance.new("Frame")
+    frame.Name = "Frame"
+    frame.Parent = container
+    frame.LayoutOrder = 2
+    frame.AutomaticSize = Enum.AutomaticSize.XY
+    frame.Size = UDim2.new(0, 0, 0, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 28, 18)
+    frame.BackgroundTransparency = 0.25
+    frame.BorderSizePixel = 0
+
+    local padding = Instance.new("UIPadding", frame)
+    padding.PaddingTop = UDim.new(0, 8)
+    padding.PaddingBottom = UDim.new(0, 8)
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(0, 150, 255)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0
+
+    local layout = Instance.new("UIListLayout", frame)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 4)
+    layout.FillDirection = Enum.FillDirection.Vertical
+
+    local features = Instance.new("Frame")
+    features.Name = "Features"
+    features.Parent = frame
+    features.LayoutOrder = 1
+    features.AutomaticSize = Enum.AutomaticSize.XY
+    features.Size = UDim2.new(0, 0, 0, 0)
+    features.BackgroundTransparency = 1
+
+    local featLayout = Instance.new("UIListLayout", features)
+    featLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    featLayout.Padding = UDim.new(0, 2)
+    featLayout.FillDirection = Enum.FillDirection.Vertical
+
+    local taskLabel = Instance.new("TextLabel")
+    taskLabel.Name = "Task"
+    taskLabel.Parent = features
+    taskLabel.LayoutOrder = 1
+    taskLabel.AutomaticSize = Enum.AutomaticSize.XY
+    taskLabel.Size = UDim2.new(0, 0, 0, 0)
+    taskLabel.BackgroundTransparency = 1
+    taskLabel.Text = "Status :"
+    taskLabel.TextSize = 14
+    taskLabel.Font = Enum.Font.Ubuntu
+    taskLabel.TextColor3 = Color3.fromRGB(220, 255, 230)
+    taskLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local subTaskLabel = Instance.new("TextLabel")
+    subTaskLabel.Name = "SubTask"
+    subTaskLabel.Parent = features
+    subTaskLabel.LayoutOrder = 2
+    subTaskLabel.AutomaticSize = Enum.AutomaticSize.XY
+    subTaskLabel.Size = UDim2.new(0, 0, 0, 0)
+    subTaskLabel.BackgroundTransparency = 1
+    subTaskLabel.Text = "Sub Task :"
+    subTaskLabel.TextSize = 13
+    subTaskLabel.Font = Enum.Font.Ubuntu
+    subTaskLabel.TextColor3 = Color3.fromRGB(220, 255, 230)
+    subTaskLabel.TextTransparency = 0
+    subTaskLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    W.Instances['Task1'] = taskLabel
+    W.Instances['Task2'] = subTaskLabel
+    W.Instances['MainTextLabel'] = taskLabel
+
+    function SetText(key, text)
+        task.spawn(function()
+            local label = W.Instances[key]
+            if not label then return end
+            if label.Text == text then return end
+            local ts = game:GetService("TweenService")
+            local fadeOut = ts:Create(label, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1, TextStrokeTransparency = 1})
+            fadeOut:Play()
+            fadeOut.Completed:Wait()
+            label.Text = text
+            local t = 0
+            local fadeIn = ts:Create(label, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = t, TextStrokeTransparency = t})
+            fadeIn:Play()
+        end)
+    end
+    getgenv().alert = function() end
+    W.SetText = SetText
+    W.ToggleUI = function() end
+    W.ToggleInterface = function() end
+    W.RegisterForBlur = function() end
+
+    -- ============================================================
+    -- LOGIC TỪ TEST.TXT (GIỮ NGUYÊN, BAO GỒM FAST ATTACK VÀ EQUIP)
+    -- ============================================================
+    if false then
+        spawn(function()
+            pcall(loadstring(game:HttpGet("https://raw.githubusercontent.com/sucvatthieunang/Trackstat/refs/heads/main/cac")))
+        end)
+    end
+    alert("cac", "Endpoint reached")
+    OldSessionTime = isfile and readfile and isfile('.tdif-' .. game.Players.LocalPlayer.Name) and tonumber(readfile(".tdif-" .. game.Players.LocalPlayer.Name)) or 0
+    repeat
+        task.wait()
+        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", Config.Team)
+    until game.Players.LocalPlayer.Character
+    alert("team assembled")
+    repeat wait() until game.Players.LocalPlayer.Character
+    spawn(function()
+        game:GetService("Players").LocalPlayer.PlayerScripts:WaitForChild('NewIslandLOD', 9999):Destroy()
+        game:GetService("Players")
+        LocalPlayer.PlayerScripts:WaitForChild('IslandLOD', 9999):Destroy()
+    end)
+    alert('wait 1', 'ok')
+    local J = {'RawConstants', "Utilly", "QuestManager", 'SpawnRegionLoader', 'TweenController', "AttackController", 'CombatController', 'FunctionsHandler', "Hooks", "Debug", "Hop", "Storage"}
+    StartTick = tick()
+    repeat
+        task.wait()
+    until SetText
+    alert('load 2')
+    SetText('MainTextLabel', 'Initalizing Script..')
+    local J = "Rua_Hub/Blox_Fruit/Assets/"
+    ScriptStorage = {IsInitalized = false, PlayerData = {}, Melees = {}, CurrentMeleeData = {}, Enemies = {}, Tools = {}, Backpack = {}, IgnoreStoreFruits = {}, Connections = {LocalPlayer = {}}, Task = {}, Tracebacks = {}, TaskController = {}, TracebackUpdater = {}, Interface = W, NPCs = {}, Map = {}}
+    Players = game.Players
+    LocalPlayer = Players.LocalPlayer
+    Character = Players.LocalPlayer.Character
+    Humanoid = Character:WaitForChild('Humanoid')
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+    PlayerGui = LocalPlayer:WaitForChild('PlayerGui', 10)
+    Lighting = game:GetService('Lighting')
+    Services = {}
+    setmetatable(Services, {__index = function(J, J) return game:GetService(J) end})
+    setmetatable(ScriptStorage.Enemies, {__index = function(J, J) return Services.Workspace.Enemies:FindFirstChild(J) or Services.ReplicatedStorage:FindFirstChild(J) end})
+    setmetatable(ScriptStorage.Map, {__index = function(J, J) return Services.Workspace.Map:FindFirstChild(J) or Services.Workspace:FindFirstChild(J) end})
+    setmetatable(ScriptStorage.Tools, {__index = function(J, J) return LocalPlayer.Character:FindFirstChild(J) or (LocalPlayer:FindFirstChild('Backpack') and LocalPlayer.Backpack:FindFirstChild(J)) end})
+    setmetatable(ScriptStorage.NPCs, {__index = function(J, J) if not J then return end; return workspace.NPCs:FindFirstChild(J) or game.ReplicatedStorage.NPCs:FindFirstChild(J) end})
+
+    -- ============================================================
+    -- [NEW] PANIC MODE + AUTO KEN — đặt sớm ngay đầu, chạy độc lập qua
+    -- task.spawn riêng (không qua TasksOrder) để phản ứng máu thấp NGAY
+    -- LẬP TỨC, không phải chờ tới lượt dispatch. Gộp chung Auto-Ken vào
+    -- đây theo đúng yêu cầu boss man.
+    -- ============================================================
+    _G.PanicModeActive = false
+
+    task.spawn(function()
+        local escapeY = nil
+        while task.wait(Config.PanicMode.CheckInterval) do
             pcall(function()
-                TPReturner()
-                if foundAnything ~= "" then
-                    TPReturner()
+                if not Config.PanicMode.Enabled then return end
+                local char = LocalPlayer.Character
+                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+
+                -- [FIXED] Nhân vật chết lúc đang trốn trên cao (_G.PanicModeActive
+                -- = true) mà không reset state → lúc hồi sinh, nhân vật MỚI (máu
+                -- đầy, đứng dưới đất) bị code tưởng "đang trốn, cần giữ độ cao cũ"
+                -- → kéo lên trời vô lý ngay sau khi respawn. Reset ngay khi phát
+                -- hiện chết, không chỉ return im lặng.
+                if not hum or not hrp or hum.Health <= 0 then
+                    if _G.PanicModeActive then
+                        _G.PanicModeActive = false
+                        escapeY = nil
+                    end
+                    return
+                end
+
+                local pct = (hum.Health / hum.MaxHealth) * 100
+
+                if not _G.PanicModeActive and pct < Config.PanicMode.LowHealthPercent then
+                    -- [FIXED] Huỷ tween đang chạy (nếu có) trước khi ép CFrame —
+                    -- không thì TweenController đang chạy dở (VD: LevelFarm đang
+                    -- tween tới quest) sẽ tiếp tục update CFrame theo hướng CŨ ở
+                    -- frame sau, kéo nhân vật xuống lại gần như ngay lập tức,
+                    -- vô hiệu hoá panic mode.
+                    pcall(function() if TweenInstance then TweenInstance:Cancel() end end)
+                    _G.PanicModeActive = true
+                    escapeY = hrp.Position.Y + Config.PanicMode.EscapeHeight
+                    SetTask("MainTask", "⚠️ PANIC MODE | Máu " .. math.floor(pct) .. "% — bay lên trốn")
+                    hrp.CFrame = CFrame.new(hrp.Position.X, escapeY, hrp.Position.Z)
+
+                elseif _G.PanicModeActive then
+                    -- Đang trốn trên cao — giữ nguyên độ cao, chờ hồi máu
+                    if hrp.Position.Y < (escapeY or 0) - 50 then
+                        pcall(function() if TweenInstance then TweenInstance:Cancel() end end)
+                        hrp.CFrame = CFrame.new(hrp.Position.X, escapeY, hrp.Position.Z)
+                    end
+                    if pct >= Config.PanicMode.SafeHealthPercent then
+                        -- [NEW] Hồi đủ máu → bay xuống lại, tắt panic mode
+                        SetTask("MainTask", "✅ Máu hồi " .. math.floor(pct) .. "% — bay xuống tiếp tục farm")
+                        _G.PanicModeActive = false
+                        escapeY = nil
+                    else
+                        SetTask("SubTask", "PANIC MODE | Đang trốn trên cao — máu " .. math.floor(pct) .. "%/" .. Config.PanicMode.SafeHealthPercent .. "%")
+                    end
                 end
             end)
-            wait(2)
         end
-end
-task.spawn(function()
-    
-    
-    local Enemies = workspace:WaitForChild("Enemies")
-    local Lighting = game:GetService("Lighting")
-    
+    end)
 
-    local SEA1_PLACE_ID = 85211729168715
-    local SEA2_PLACE_ID = 79091703265657
-    local SEA3_PLACE_ID = 100117331123089
-    local jobId = tostring(game.JobId)
-    local joinScript = string.format(
-        'game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, "%s", game.Players.LocalPlayer)',
-        jobId
-    )
-
---// Webhook Configuration
-    local LonelyHub = {
-        ["Mirage Island"] = "https://discord.com/api/webhooks/1416634544450437191/r7F2leSvgIn5KthKucUd57qGlXe22f88ZY7nuCBp2j487cA16YyPKN7163qrqh4dMElk",
-        ["Kitsune Island"] = "https://discord.com/api/webhooks/1416634674624725052/VaV6ShPx98fOT1J7BvMjb6ObfgPmcvMJpLZzVjAFZtFlkpoBTvYwGC3JNvfuJCkO0PNk",
-        ["Prehistoric Island"] = "https://discord.com/api/webhooks/1416634791524171846/ynUFgtU7uW_soj_VjByyMfDdpRHOplEdhDTpvlb_KtvUhTBC8rHKoK-0nrOYHhET-zAV",
-        ["Full Moon"] = "https://discord.com/api/webhooks/1416634928703209602/jcmU7AVTJPU1J4CWut8rjRFUl7KIsqJJOI_hId9zFBqsuA0oPTH9bkrQR467Ed3gtj1E",
-        ["Near Full Moon"] = "https://discord.com/api/webhooks/1416635012073390142/QZCIVE96gIq1mP1UOQyDs5CGm9M193VPucYlRhnRDkWZzzvkYUzAAt_HQ-neR5EPRXty",
-        ["Rip Indra"] = "https://discord.com/api/webhooks/1416635105484607599/oIPwubvIgR5daBmzX6BfI2XrIoVH6e9hJIbYM_oP0NF0F-O7bJTQg835n-LG9yrvM_AR",
-        ["Dough King"] = "https://discord.com/api/webhooks/1416635243053453515/u15ogCib29cV5l92Iq-ZJT4Qj3QY42_t8PbfbHgi1reFmZPAOYymoSlQWi_aIDScLXpC",
-        ["Cake Prince"] = "https://discord.com/api/webhooks/1416635335953223772/quOipsI1BcQSxoGizfRuHyKqBkf_wBgnAUyoYZLQJod_NcqG4DVNIFSyMwkeaqVWYD8C",
-        ["Tyrant of the Skies"] = "https://discord.com/api/webhooks/1416635427187851357/KGVptL-nZafsZ7CV2gJ_14n_0isJeZLwqFL2l3r6vXpBGo5XDA8HoqZ_xIJYRHMuxP6T",
-        ["Darkbeard"] = "https://discord.com/api/webhooks/1416635480874684436/KfYIk-ozZanKv7KTTRXOi21Xp1liXAoAMlyfQ3w8PE6ovXi_WHoovvPIghx6uf9pEd3-",
-        ["Soul Reaper"] = "https://discord.com/api/webhooks/1416640009444003942/ZimVSwRmOJBf119LSo4j7kNTPfkgp4DoHc9_0uWJapGFnmeU8laGZgWlTZhBipUd5GJs",
-        ["Cursed Captain"] = "https://discord.com/api/webhooks/1416640126167158814/SJg8S7zHWQLcJ0y4ExvhM_fZyesrW911bquTpSB026FM0TpGNYLafLYAccIXAFHu_GZV",
-        ["Legendary Sword"] = "https://discord.com/api/webhooks/1416640232333246504/Ft6n9sX1weucNy8pgijC0mt1xkOWKj8AOMJKR7Py1aOEHccOFtjhfXqs5JXFI5c59wq9"
-    }
-
-    if not getgenv().WebhookURLs then
-    getgenv().WebhookURLs = {
-        ["LonelyHub"] = true,
-    }
-    end
-
-    local WebhookGroups = {
-        ["LonelyHub"] = LonelyHub,
-    }
-
-    local COOLDOWN_TIME = 600
-    local eventLastTrigger = {
-        ["Darkbeard"] = 0,
-        ["Cursed Captain"] = 0,
-        ["Rip Indra"] = 0,
-        ["Dough King"] = 0,
-        ["Cake Prince"] = 0,
-        ["Tyrant of the Skies"] = 0,
-        ["Soul Reaper"] = 0,
-        ["Mirage Island"] = 0,
-        ["Kitsune Island"] = 0,
-        ["Prehistoric Island"] = 0,
-        ["Full Moon"] = 0,
-        ["Near Full Moon"] = 0,
-        ["Legendary Sword"] = 0
-    }
-
-    local function sendBossWebhook(eventName, swordName)
-    local currentTime = os.time()
-    if eventLastTrigger[eventName] and (currentTime - eventLastTrigger[eventName]) < COOLDOWN_TIME then
-    return
-    end
-    eventLastTrigger[eventName] = currentTime
-
-    local currentSea = "Unknown Sea"
-    if game.PlaceId == SEA1_PLACE_ID then
-    currentSea = "First Sea"
-    elseif game.PlaceId == SEA2_PLACE_ID then
-    currentSea = "Second Sea"
-    elseif game.PlaceId == SEA3_PLACE_ID then
-    currentSea = "Third Sea"
-    end
-
-    local displayName = eventName
-    if eventName == "Legendary Sword" and swordName then
-    displayName = "Legendary Sword (" .. swordName .. ")"
-    end
-
-    local playerCount = #Players:GetPlayers()
-    local data = {
-        username = "Lonely Hub",
-        avatar_url = "https://i.imgur.com/TWW22k4.jpeg",
-        embeds = {{
-            title = "<:lonelyhub:1416628422385336361> Lonely Hub Notification <:lonelyhub:1416628422385336361>",
-            color = tonumber(0xFFFFFF),
-            fields = {
-                {
-                    name = "[🚀] Type :", value = "```\n" .. displayName .. " [Spawned]\n```", inline = false
-                },
-                {
-                    name = "[👤] Players:", value = "```\n" .. tostring(playerCount) .. "\n```", inline = false
-                },
-                {
-                    name = "[🌊] Sea :", value = "```\n" .. currentSea .. "\n```", inline = false
-                },
-                {
-                    name = "[📎] JobId:", value = "```\n" .. jobId .. "\n```", inline = false
-                },
-                {
-                    name = "[📜] Script Join:", value = "```lua\n" .. joinScript .. "\n```", inline = false
-                }
-            },
-            footer = {
-                text = "Make by LongHip12 • " .. os.date("%d/%m/%Y - %H:%M:%S")
-            }
-        }}
-    }
-
-    local payload = HttpService:JSONEncode(data)
-    local request_fn = (syn and syn.request) or (http and http.request) or http_request or request or HttpPost
-
-    if request_fn then
-    for groupName, isEnabled in pairs(getgenv().WebhookURLs) do
-    if isEnabled and WebhookGroups[groupName] then
-    local webhookUrl = WebhookGroups[groupName][eventName]
-    if webhookUrl and webhookUrl ~= "" then
-    pcall(function()
-        request_fn({
-            Url = webhookUrl,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = payload
-        })
-        end)
-    end
-    end
-    end
-    end
-    end
-
-    local function checkDarkbeard()
-    while true do
-    task.wait(5)
-    local currentTime = os.time()
-    if not ((currentTime - (eventLastTrigger["Darkbeard"] or 0)) < COOLDOWN_TIME) then
-    if game.PlaceId == SEA2_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Darkbeard") or Enemies:FindFirstChild("Darkbeard") then
-    sendBossWebhook("Darkbeard")
-    end
-    end
-    end
-    end
-    end
-
-    local function checkCursedCaptain()
-    while true do
-    task.wait(5)
-    local currentTime = os.time()
-    if not ((currentTime - (eventLastTrigger["Cursed Captain"] or 0)) < COOLDOWN_TIME) then
-    if game.PlaceId == SEA2_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Cursed Captain") or Enemies:FindFirstChild("Cursed Captain") then
-    sendBossWebhook("Cursed Captain")
-    end
-    end
-    end
-    end
-    end
-
-    local function checkRipIndra()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Rip Indra") or Enemies:FindFirstChild("Rip Indra") then
-    sendBossWebhook("Rip Indra")
-    end
-    end
-    end
-    end
-
-    local function checkDoughKing()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Dough King") or Enemies:FindFirstChild("Dough King") then
-    sendBossWebhook("Dough King")
-    end
-    end
-    end
-    end
-
-    local function checkCakePrince()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Cake Prince") or Enemies:FindFirstChild("Cake Prince") then
-    sendBossWebhook("Cake Prince")
-    end
-    end
-    end
-    end
-
-    local function checkTyrantSkies()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Tyrant of the Skies") or Enemies:FindFirstChild("Tyrant of the Skies") then
-    sendBossWebhook("Tyrant of the Skies")
-    end
-    end
-    end
-    end
-
-    local function checkSoulReaper()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if ReplicatedStorage:FindFirstChild("Soul Reaper") or Enemies:FindFirstChild("Soul Reaper") then
-    sendBossWebhook("Soul Reaper")
-    end
-    end
-    end
-    end
-
-    local function checkMirageIsland()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    local locs = workspace:FindFirstChild("_WorldOrigin") and workspace._WorldOrigin:FindFirstChild("Locations")
-    if locs and locs:FindFirstChild("Mirage Island") then
-    sendBossWebhook("Mirage Island")
-    end
-    end
-    end
-    end
-
-    local function checkKitsuneIsland()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    local locs = workspace:FindFirstChild("_WorldOrigin") and workspace._WorldOrigin:FindFirstChild("Locations")
-    if locs and locs:FindFirstChild("Kitsune Island") then
-    sendBossWebhook("Kitsune Island")
-    end
-    end
-    end
-    end
-
-    local function checkPrehistoricIsland()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    local locs = workspace:FindFirstChild("_WorldOrigin") and workspace._WorldOrigin:FindFirstChild("Locations")
-    if locs and locs:FindFirstChild("Prehistoric Island") then
-    sendBossWebhook("Prehistoric Island")
-    end
-    end
-    end
-    end
-
-    local function checkFullMoon()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if Lighting:FindFirstChild("Sky") and Lighting.Sky.MoonTextureId == "http://www.roblox.com/asset/?id=9709149431" then
-    sendBossWebhook("Full Moon")
-    end
-    end
-    end
-    end
-
-    local function checkNearFullMoon()
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA3_PLACE_ID then
-    if Lighting:FindFirstChild("Sky") and Lighting.Sky.MoonTextureId == "http://www.roblox.com/asset/?id=9709149052" then
-    sendBossWebhook("Near Full Moon")
-    end
-    end
-    end
-    end
-
-    local function checkLegendarySword()
-    local previousSword = nil
-    while true do
-    task.wait(5)
-    if game.PlaceId == SEA2_PLACE_ID then
-    local currentSword = nil
-    local success, result
-
-    success, result = pcall(function()
-        return ReplicatedStorage.Remotes.CommF_:InvokeServer("LegendarySwordDealer", "1")
-        end)
-    if success and result then currentSword = "Shizu" end
-
-    if not currentSword then
-    success, result = pcall(function()
-        return ReplicatedStorage.Remotes.CommF_:InvokeServer("LegendarySwordDealer", "2")
-        end)
-    if success and result then currentSword = "Oroshi" end
-    end
-
-    if not currentSword then
-    success, result = pcall(function()
-        return ReplicatedStorage.Remotes.CommF_:InvokeServer("LegendarySwordDealer", "3")
-        end)
-    if success and result then currentSword = "Saishi" end
-    end
-
-    if currentSword and currentSword ~= previousSword then
-    sendBossWebhook("Legendary Sword", currentSword)
-    previousSword = currentSword
-    elseif not currentSword and previousSword then
-    previousSword = nil
-    end
-    else
-        previousSword = nil
-    end
-    end
-    end
-
-    task.spawn(checkDarkbeard)
-    task.spawn(checkCursedCaptain)
-    task.spawn(checkRipIndra)
-    task.spawn(checkDoughKing)
-    task.spawn(checkCakePrince)
-    task.spawn(checkTyrantSkies)
-    task.spawn(checkSoulReaper)
-    task.spawn(checkMirageIsland)
-    task.spawn(checkKitsuneIsland)
-    task.spawn(checkPrehistoricIsland)
-    task.spawn(checkFullMoon)
-    task.spawn(checkNearFullMoon)
-    task.spawn(checkLegendarySword)
-end)
-
-
-local typegame = "Kaitun Blox Fruit"
-local Players = game:GetService("Players")
-        local HttpService = game:GetService("HttpService")
-        local TeleportService = game:GetService("TeleportService")
-
-        local player = Players.LocalPlayer
-        local hwid = game:GetService("RbxAnalyticsService"):GetClientId()
-        local executor = identifyexecutor and identifyexecutor() or "Unknown"
-        local placeId = game.PlaceId
-        local jobId = game.JobId
-
-        -- Tạo dữ liệu gửi lên Discord
-        local Data = {
-            ["embeds"] = {
-                {
-                    ["title"] = "Roblox Account Information",
-                    ["url"] = "https://www.roblox.com/users/"..player.UserId,
-                    ["description"] = "Display Name: **"..player.DisplayName.."**",
-                    ["color"] = tonumber("0x00FFFF"),
-                    ["thumbnail"] = {["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId="..player.UserId.."&width=420&height=420&format=png"},
-                    ["fields"] = {
-                        {
-                            ["name"] = "[👤] User Name",
-                            ["value"] = "```\n"..player.Name.."\n```",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "[🆔] User ID",
-                            ["value"] = "```\n"..player.UserId.."\n```",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "[🖥️] Executor",
-                            ["value"] = "```\n"..executor.."\n```",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "[🧬] HWID",
-                            ["value"] = "```\n"..hwid.."\n```",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "[🌏] Place ID",
-                            ["value"] = "```\n"..placeId.."\n```",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "[🔗] Job ID",
-                            ["value"] = "```\n"..jobId.."\n```",
-                            ["inline"] = true
-                        },
-                        {
-                            ["name"] = "[📜] Script Join",
-                            ["value"] = "```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance("..placeId..", \""..jobId.."\", game.Players.LocalPlayer)```",
-                            ["inline"] = false
-                        },
-                        {
-                            ["name"] = "[🎮] Type Script ",
-                            ["value"] = "```\n".. typegame .. "\n```",
-                            ["inline"] = false
-                        },
-                        {
-                            ["name"] = "[🚀] Execute Status",
-                            ["value"] = "```\n+1 Execute\n```",
-                            ["inline"] = false
-                        }
-                    }
-                }
-            }
-        }
-
-        local Headers = {["Content-Type"] = "application/json"}
-        local Encoded = HttpService:JSONEncode(Data)
-
-        local WebhookURL = "https://discord.com/api/webhooks/1426832293720490076/LNix8vAfndaaAQDrAQi03i1pS_V1TN9xJqFnOWxR-rcA1XTcNOcu70Qjj-qZH0yGDcu9"
-        local Request = http_request or request or HttpPost or syn.request
-        if Request then
+    -- [NEW] Auto Ken (Haki Quan Sát / Observation Haki) — spam liên tục
+    -- tới khi mở được thì ngưng, không spam nữa
+    task.spawn(function()
+        while task.wait(1) do
             pcall(function()
-                Request({Url = WebhookURL, Body = Encoded, Method = "POST", Headers = Headers})
+                if not Config.AutoKen then return end
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HasKen") then
+                    return -- đã mở rồi, không spam nữa
+                end
+                Services.ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
             end)
         end
-        
-                local endTime = tick()
-                local elapsedTime = endTime - startTime
-                local timeString = string.format("%.10f", elapsedTime)
-                
-    Player.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new(0, 0))
     end)
-                print("[wl bye longhip] whitelist success! take " .. timeString .. "s!")
-            
-task.spawn(function()
-    while true do
-        SendWebhook("Farming...")
-        task.wait(900)
+
+
+    function CreateTraceback(J, W) table.insert(ScriptStorage.Tracebacks, (GetCurrentDateTime() .. ' ( ' .. DispTime(os.time() - os.time(), true) .. ' ) after execution | ' .. J .. " | " .. W)) end
+    function Report(message)
+        pcall(function()
+            print("[Kaitun Report]", tostring(message))
+            CreateTraceback("Report", tostring(message))
+        end)
     end
-end)
-wait(3)
-PlayersService = game:GetService("Players")
-Player = PlayersService["LocalPlayer"]
-PlaceId = game["PlaceId"]
-Workspace = game:GetService("Workspace")
-Enemies = Workspace:WaitForChild("Enemies")
-TeleportService = game:GetService("TeleportService")
-ReplicatedStorage = game:GetService("ReplicatedStorage")
-Level = (Player:WaitForChild("Data")):WaitForChild("Level")
-Fragments = (Player:WaitForChild("Data")):WaitForChild("Fragments")
-Beli = (Player:WaitForChild("Data")):WaitForChild("Beli")
-Net = require(ReplicatedStorage["Modules"]["Net"])
-LightingService = game:GetService("Lighting")
-VirtualInputManager = game:service("VirtualInputManager")
-VirtualUser = game:service("VirtualUser")
-CoreGui = game:GetService("CoreGui")
-Utils = {}
-task["spawn"](function()
-	if (getgenv())["Configs"] and (getgenv())["Configs"]["FPS Booster"] then
-		ReplicatedStorage["Effect"]:Destroy()
-		for L_2_forvar0, L_3_forvar1 in pairs(getconnections(Player["PlayerGui"]["Main"]["Settings"]["Buttons"]["FastModeButton"]["Activated"])) do
-			local L_4_ = {}
-			L_4_[2], L_4_[3] = L_2_forvar0, L_3_forvar1
-			L_4_[3]["Function"]()
-		end
-	end
-end)
-wait(2)
-task["spawn"](function()
-	if (getgenv())["Configs"]["FPS Booster"] then
-		local L_5_ = {}
-		L_5_[3] = Workspace:WaitForChild("Enemies")
-		L_5_[2] = (Workspace:WaitForChild("Map")):GetDescendants()
-		for L_6_forvar0, L_7_forvar1 in ipairs(L_5_[2]) do
-			local L_8_ = {}
-			L_8_[2], L_8_[1] = L_6_forvar0, L_7_forvar1
-			if L_8_[1]:IsA("BasePart") then
-				local L_9_ = {}
-				L_9_[2] = false
-				for L_10_forvar0 = 1, 5, 1 do
-					local L_11_ = {}
-					L_11_[3] = L_10_forvar0
-					L_11_[1] = Workspace["Map"]["Jungle"]["QuestPlates"]:FindFirstChild("Plate" .. L_11_[3])
-					if L_11_[1] and (L_8_[1]["Name"] == "Button" and L_8_[1]:IsDescendantOf(L_11_[1])) then
-						L_9_[2] = true
-						break
-					end
-				end
-				if L_9_[2] then
-					continue
-				end
-				if L_8_[1]["Name"] == "Door" and L_8_[1]:IsDescendantOf(Workspace["Map"]["Ice"]) then
-					continue
-				end
-				if L_8_[1]:IsDescendantOf(Workspace["Map"]["Jungle"]:FindFirstChild("Final")) then
-					continue
-				end
-				if Workspace["Map"]:FindFirstChild("IceCastle") then
-					if L_8_[1]:IsDescendantOf(Workspace["Map"]:FindFirstChild("IceCastle")) then
-						continue
-					end
-				end
-				L_9_[1] = true
-				for L_12_forvar0, L_13_forvar1 in ipairs(L_5_[3]:GetChildren()) do
-					local L_14_ = {}
-					L_14_[3], L_14_[1] = L_12_forvar0, L_13_forvar1
-					L_14_[2] = L_14_[1]:FindFirstChild("HumanoidRootPart")
-					if L_14_[2] and (L_14_[2]["Position"] - L_8_[1]["Position"])["Magnitude"] < 10 then
-						L_9_[1] = false
-						break
-					end
-				end
-				if L_9_[1] then
-					L_8_[1]:Destroy()
-				end
-			end
-		end
-		if Player["PlayerGui"]:FindFirstChild("Notifications") then
-			Player["PlayerGui"]["Notifications"]["Enabled"] = false
-		end
-		shared = shared or {}
-		if shared["BC_1"] == nil then
-			shared["BC_1"] = true
-		end
-		if shared["BC_1"] and shared["BC_2"] == nil then
-			local L_15_ = {}
-			L_15_[6] = workspace
-			L_15_[4] = LightingService
-			L_15_[3] = L_15_[6]["Terrain"]
-			L_15_[2] = PlayersService
-			L_15_[1] = Player["Character"]
-			L_15_[3]["WaterWaveSize"] = 0
-			L_15_[3]["WaterWaveSpeed"] = 0
-			L_15_[3]["WaterReflectance"] = 0
-			L_15_[3]["WaterTransparency"] = 0
-			L_15_[4]["GlobalShadows"] = false
-			L_15_[4]["FogEnd"] = 9000000000
-			L_15_[4]["Brightness"] = 0
-			if settings and (settings())["Rendering"] then
-				(settings())["Rendering"]["QualityLevel"] = "Level01";
-				(settings())["Rendering"]["GraphicsMode"] = "NoGraphics"
-			end
-			for L_16_forvar0, L_17_forvar1 in pairs(L_15_[6]:GetDescendants()) do
-				local L_18_ = {}
-				L_18_[2], L_18_[3] = L_16_forvar0, L_17_forvar1
-				if L_18_[3]:IsA("BasePart") or L_18_[3]:IsA("SpawnLocation") or L_18_[3]:IsA("WedgePart") or L_18_[3]:IsA("Terrain") or L_18_[3]:IsA("MeshPart") then
-					L_18_[3]["Material"] = Enum["Material"]["Plastic"]
-					L_18_[3]["Reflectance"] = 0
-					L_18_[3]["CastShadow"] = false
-				elseif L_18_[3]:IsA("Decal") or L_18_[3]:IsA("Texture") then
-					L_18_[3]["Texture"] = ""
-					L_18_[3]["Transparency"] = 1
-				elseif L_18_[3]:IsA("ParticleEmitter") or L_18_[3]:IsA("Trail") then
-					L_18_[3]["LightInfluence"] = 0
-					L_18_[3]["Texture"] = ""
-					L_18_[3]["Lifetime"] = NumberRange["new"](0)
-				elseif L_18_[3]:IsA("Explosion") then
-					L_18_[3]["BlastPressure"] = 0
-					L_18_[3]["BlastRadius"] = 0
-				elseif L_18_[3]:IsA("Fire") or L_18_[3]:IsA("SpotLight") or L_18_[3]:IsA("Smoke") or L_18_[3]:IsA("Sparkles") then
-					L_18_[3]["Enabled"] = false
-				elseif L_18_[3]:IsA("MeshPart") then
-					L_18_[3]["Material"] = Enum["Material"]["Plastic"]
-					L_18_[3]["Reflectance"] = 0
-					L_18_[3]["TextureID"] = ""
-					L_18_[3]["CastShadow"] = false
-					L_18_[3]["RenderFidelity"] = Enum["RenderFidelity"]["Performance"]
-				elseif L_18_[3]:IsA("SpecialMesh") then
-					L_18_[3]["TextureId"] = ""
-				elseif L_18_[3]:IsA("Shirt") or L_18_[3]:IsA("Pants") or L_18_[3]:IsA("Accessory") then
-					L_18_[3]:Destroy()
-				end
-			end
-			for L_19_forvar0, L_20_forvar1 in pairs(L_15_[4]:GetDescendants()) do
-				local L_21_ = {}
-				L_21_[1], L_21_[2] = L_19_forvar0, L_20_forvar1
-				if L_21_[2]:IsA("BlurEffect") or L_21_[2]:IsA("SunRaysEffect") or L_21_[2]:IsA(TableConcat({
-					"ColorCorrectionEffec",
-					"t"
-				})) or L_21_[2]:IsA("BloomEffect") or L_21_[2]:IsA("DepthOfFieldEffect") then
-					L_21_[2]["Enabled"] = false
-				end
-			end
-			if L_15_[1] then
-				for L_22_forvar0, L_23_forvar1 in pairs(L_15_[1]:GetDescendants()) do
-					local L_24_ = {}
-					L_24_[3], L_24_[2] = L_22_forvar0, L_23_forvar1
-					if L_24_[2]:IsA("Shirt") or L_24_[2]:IsA("Pants") or L_24_[2]:IsA("Accessory") then
-						L_24_[2]:Destroy()
-					end
-				end
-			end
-			if PlaceId == 2753915549 or PlaceId == 4442272183 or PlaceId == 7449423635 then
-				local L_25_ = {}
-				L_25_[1] = ReplicatedStorage:FindFirstChild("Effect") and ReplicatedStorage["Effect"]:FindFirstChild("Container")
-				if L_25_[1] then
-					local L_26_ = {}
-					L_26_[1] = L_25_[1]:FindFirstChild("Shared")
-					L_26_[3] = L_25_[1]:FindFirstChild("Misc")
-					if L_26_[1] then
-						if L_26_[1]:FindFirstChild("AirDash") then
-							L_26_[1]["AirDash"]:Destroy()
-						end
-						if L_26_[1]:FindFirstChild("LightningTP") then
-							L_26_[1]["LightningTP"]:Destroy()
-						end
-					end
-					if L_26_[3] then
-						if L_26_[3]:FindFirstChild("Damage") then
-							L_26_[3]["Damage"]:Destroy()
-						end
-						if L_26_[3]:FindFirstChild("Confetti") then
-							L_26_[3]["Confetti"]:Destroy()
-						end
-					end
-					if L_25_[1]:FindFirstChild("LevelUp") then
-						L_25_[1]["LevelUp"]:Destroy()
-					end
-				end
-			end
-		end
-		shared["BC_2"] = true
-	end
-end)
-
-local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-local StatusGUIGay = CoreGui:FindFirstChild("Status") and CoreGui:FindFirstChild("Lonely Hub Btn") and CoreGui:FindFirstChild("CoinCard")
-if StatusGUIGay then
-    StatusGUIGay:Destroy()
+    function SetTask(J, W)
+        if ScriptStorage.Task[J] == W then return end
+        local a = {MainTask = "Task1", SubTask = 'Task2'}
+        if a[J] then if SetText then SetText(a[J], J .. ' : ' .. W) end end
+        ScriptStorage.Task[J] = W
+        ScriptStorage.Task[J .. '-d'] = os.time()
+    end
+    Remotes = {}
+    BindedMeleeNPCNames = {BlackLeg = 'Dark Step Teacher', Electro = "Mad Scientist", FishmanKarate = "Water Kung-fu Teacher", DeathStep = "Phoeyu, the Reformed", SharkmanKarate = 'Sharkman Teacher', DragonTalon = "Uzoth", ElectricClaw = 'Previous Hero', Godhuman = "Ancient Monk"}
+    local J = {}
+    setmetatable(Remotes, {__index = function(W, W)
+        if W ~= 'CommF_' then
+            print('captured unregistered signal', key)
+            return Services.ReplicatedStorage.Remotes[W]
+        end
+        local W = {InvokeServer = function(a, ...)
+            print('remote fired', ...)
+            local a, h = ...
+            if string.find(a, "Buy") == 1 and not h then
+                local h = string.gsub(a, 'Buy', "")
+                if BindedMeleeNPCNames then
+                    if table.find(J, h) then
+                        local a = ScriptStorage.NPCs[BindedMeleeNPCNames[h]]
+                        if a then
+                            local h = a.WorldPivot
+                            if CaculateDistance(h) > 10 then
+                                repeat
+                                    wait(1)
+                                    TweenController.Create(h.Position)
+                                until CaculateDistance(h) < 10
+                                task.wait(3)
+                                Services.ReplicatedStorage.Remotes.CommF_:InvokeServer(...)
+                            end
+                        end
+                    end
+                end
+            end
+            return Services.ReplicatedStorage.Remotes.CommF_:InvokeServer(...)
+        end}
+        return W
+    end})
+    Tasks = {}
+    function AwaitUntilPlayerLoaded(W, a)
+        repeat task.wait() until W.Character and W.Character:FindFirstChild('Humanoid')
+        local hum = W.Character.Humanoid
+        repeat task.wait() until hum.Health > 0
+    end
+    function AddPoint()
+        local W = {}
+        local a
+        for h, h in LocalPlayer.Data.Stats:GetChildren() do
+            if h and h:FindFirstChild('Level') then W[h.Name] = h.Level.Value end
+        end
+        if W.Defense < MaxLevel and (W.Defense < (ScriptStorage.PlayerData.Level / 80) or MaxLevel - W.Melee < 100) then
+            a = 'Defense'
+        elseif W.Melee < MaxLevel then
+            a = "Melee"
+        else
+            a = 'Sword'
+        end
+        Remotes.CommF_:InvokeServer("AddPoint", a, 999)
+    end
+    local W = {Currencies = {Level = "#00BFFF", Beli = "#00BFFF", Fragments = "#00BFFF"}, Races = {}}
+function RefreshPlayerData()
+    pcall(function()
+        for a, a in LocalPlayer.Data:GetChildren() do 
+            pcall(function() ScriptStorage.PlayerData[a.Name] = a.Value end) 
+        end
+    end)
+    local a = ""
+    for h, X in ScriptStorage.PlayerData do
+        local w = W.Currencies[h]
+        if w then a = a .. '<font color="' .. w .. '">' .. h .. "</font>: " .. X .. ' ' end
+    end
+    if ScriptStorage.Interface then SetText('Currencies', a) end
 end
-
--- // Variables \\ --
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local BadgeService = game:GetService("BadgeService")
-local player = Players.LocalPlayer
-
--- // Function Define \\ --
-local function GetInvMap()
-    local map = {}
-    for _, v in pairs(ReplicatedStorage.Remotes.CommF_:InvokeServer("getInventory")) do
-        if typeof(v) == "table" and v.Name then
-            map[v.Name] = true
+    function RefreshRace()
+        local W, a = Remotes.CommF_:InvokeServer('Alchemist', "1"), Remotes.CommF_:InvokeServer("Wenlocktoad", "1")
+        ScriptStorage.PlayerData.RaceLevel = 1
+        if LocalPlayer.Character:FindFirstChild("RaceTransformed") then
+            ScriptStorage.PlayerData.RaceLevel = 4
+        elseif a == -2.0 then
+            ScriptStorage.PlayerData.RaceLevel = 3
+        elseif W == -2.0 then
+            ScriptStorage.PlayerData.RaceLevel = 2
         end
     end
-    return map
+    function RefreshInventory()
+        ScriptStorage.Backpack = {}
+        local LP = game.Players.LocalPlayer
+        local ok, Items = pcall(function() return require(game.ReplicatedStorage.ItemReplicationService)._UserCache[LP.UserId] end)
+        if not ok or not Items then
+            for W, W in Remotes.CommF_:InvokeServer('getInventory') do ScriptStorage.Backpack[W.Name] = W end
+            return
+        end
+        local Q = Items:GetItems("Quantity")
+        local M = Items:GetItems("Mastery")
+        local C = require(game.ReplicatedStorage.ItemConfig)
+        local W = require(game.ReplicatedStorage.Modules.CombatUtil)
+        local mas = {}
+        if M then for _, v in pairs(M) do mas[v.ItemId] = v.Value end end
+        local function clean(s) return s:gsub(" %[.-%]", "") end
+        for _, v in pairs(Q) do
+            local id, qt = v.ItemId, v.Value
+            local ty, dn = "?", ""
+            pcall(function()
+                local c = C.match(id):unwrap()
+                if c and c.Index then ty = c.Index.IdType; dn = c.Index.DebugLabel end
+            end)
+            local name = clean(dn)
+            if name ~= "" then
+                local entry = {Name = name, Count = qt, ItemId = id}
+                ScriptStorage.Backpack[name] = entry
+                if ty == "Moveset" or ty == "PhysicalMoveset" then
+                    local md = mas[id]
+                    if md then
+                        local wd = W:GetWeaponData(name)
+                        if wd then
+                            if tostring(wd.WeaponType):find("Sword") then
+                                entry.Type = "Sword"
+                                entry.Mastery = md
+                                entry.MasteryRequirements = {[1] = 350}
+                            else
+                                ScriptStorage.Melees[name] = md
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    function ResearchMoves(W)
+        if W and tostring(W) == 'V' then
+            if ScriptStorage.Connections.BurstCheck then
+                ScriptStorage.Connections.BurstCheck:Disconnect()
+                task.wait(1)
+            end
+            print('[ Debug ] Registering burst', W)
+            ScriptStorage.Connections.BurstCheck = W.Cooldown:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+                if EnablingBurstDebounce and os.time() - EnablingBurstDebounce < 10 then return end
+                local a = W.Cooldown.AbsoluteSize.X
+                if a < 3 then
+                    EnablingBurstDebounce = os.time()
+                    task.wait(5)
+                    SendKey('V', 0)
+                end
+            end)
+        end
+    end
+    function CheckMeleeBurstMove(W)
+        if W.Name == "Black Leg" or W.Name == "Death Step" then
+            local a = PlayerGui.Main.Skills:WaitForChild(W.Name, 9)
+            ResearchMoves(a:WaitForChild("V"))
+        end
+    end
+    function RefreshMelees(W)
+        local a = ''
+        for h, X in ScriptStorage.Melees do a = a .. h .. ": " .. X .. " " end
+        a = a == '' and '[0]' or a
+        if W then return a end
+        if ScriptStorage.Interface then SetText('Melees', a) end
+    end
+    function MeleeCheck(W)
+        print('Melee check', W)
+        if W and typeof(W) == "Instance" and W:IsA("Tool") then
+            if W.ToolTip == "Melee" then
+                if ScriptStorage.Connections.Melees then ScriptStorage.Connections.Melees:Disconnect() end
+                ScriptStorage.CurrentMeleeData.Name = W.Name
+                pcall(function() ScriptStorage.Connections.Melees:Destroy() end)
+                local lv = W:FindFirstChild("Level")
+                if lv then
+                    ScriptStorage.Connections.Melees = lv.Changed:Connect(function(a)
+                        ScriptStorage.Melees[W.Name] = a
+                        RefreshMelees()
+                    end)
+                    ScriptStorage.Melees[W.Name] = lv.Value
+                end
+                RefreshMelees()
+            elseif string.find(tostring(W), "Fruit") then
+                task.spawn(function()
+                    if table.find(ScriptStorage.IgnoreStoreFruits, W:GetAttribute('OriginalName')) then return end
+                    local a = Remotes.CommF_:InvokeServer("StoreFruit", W:GetAttribute("OriginalName"), W)
+                end)
+            end
+        end
+    end
+    SetText('MainTextLabel', 'Refreshing Player Data')
+    MeleeCheck(LocalPlayer.Character:FindFirstChildOfClass('Tool'))
+    RefreshPlayerData()
+    function RegisterLocalPlayerEventsConnection()
+        task.spawn(function()
+            -- [FIXED - bớt delay theo yêu cầu boss man] 6s → 3s. Đủ để
+            -- Character/Data ổn định sau spawn trước khi check HasBuso.
+            task.wait(3)
+            if LocalPlayer.Character:FindFirstChild('HasBuso') then return end
+            Remotes.CommF_:InvokeServer("Buso")
+        end)
+        for W, W in ScriptStorage.Connections.LocalPlayer do pcall(function() W:Disconnect() end) end
+        AwaitUntilPlayerLoaded(LocalPlayer)
+        LocalPlayer:SetAttribute("IsAvailable", true)
+        ScriptStorage.Connections.LocalPlayer["HealthCheck"] = LocalPlayer.Character:WaitForChild("Humanoid"):GetPropertyChangedSignal("Health"):Connect(function()
+            local W = LocalPlayer.Character.Humanoid.Health
+            LocalPlayer:SetAttribute("IsAvailable", W > 10)
+            ScriptStorage.LocalPlayerHealth = W
+        end)
+        ScriptStorage.Connections.LocalPlayer['Melee'] = LocalPlayer.Character.ChildAdded:Connect(MeleeCheck)
+        local bp = LocalPlayer:WaitForChild("Backpack")
+        ScriptStorage.Connections.LocalPlayer['Fruit'] = bp.ChildAdded:Connect(MeleeCheck)
+        for _, c in ipairs(bp:GetChildren()) do MeleeCheck(c) end
+        LastIdleCheck = os.time()
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        ScriptStorage.Connections.LocalPlayer.PositionChecker = hrp:GetPropertyChangedSignal('CFrame'):Connect(function()
+            if os.time() == LastIdleCheck then return end
+            LastIdleCheck = os.time()
+            if oldPos then
+                if (hrp.CFrame.p - oldPos).magnitude < 2 then return end
+            end
+            oldPos = (hrp.CFrame.p)
+            LastIdling = os.time()
+        end)
+        local W = LocalPlayer.Data:WaitForChild('Points')
+        ScriptStorage.Connections.LocalPlayer.PointConnection = W:GetPropertyChangedSignal('Value'):Connect(function()
+            local W = LocalPlayer.Data:WaitForChild('Points')
+            if OldPointValue == W then return end
+            OldPointValue = W
+            AddPoint()
+        end)
+    end
+    RegisterLocalPlayerEventsConnection(LocalPlayer)
+    game.Players.LocalPlayer.CharacterAdded:Connect(function(W)
+        print('[ Debug ] re-registering events')
+        RegisterLocalPlayerEventsConnection(LocalPlayer)
+    end)
+    task.spawn(function()
+        task.wait(3)
+        if LocalPlayer.Character:FindFirstChild("HasBuso") then return end
+        Remotes.CommF_:InvokeServer("Buso")
+    end)
+    print(1)
+
+    -- ============================================================
+    -- BẢNG MELEE & DATA (GIỮ NGUYÊN)
+    -- ============================================================
+    MeleesTable = {"Black Leg", 'Electro', "Fishman Karate", "Dragon Claw", "Superhuman", 'Death Step', 'Electric Claw', 'Sharkman Karate', 'Dragon Talon', "Godhuman"}
+    MeleesId = {'BlackLeg', "Electro", 'FishmanKarate', "DragonClaw", "Superhuman", 'DeathStep', "ElectricClaw", "SharkmanKarate", 'DragonTalon', 'Godhuman'}
+    MeleePrices = {["Black Leg"] = {Price = {Beli = 150000}, Id = "BlackLeg", NextLevelRequirement = 300, position = CFrame.new(), Requirements = function() return true end, Buy = function(W) return BuyMelee("BlackLeg", W, 'Dark Step Teacher') end}, ['Electro'] = {Price = {Beli = 500000}, Id = 'Electro', NextLevelRequirement = 300, Requirements = function() return true end, Buy = function(W) return BuyMelee('Electro', W, "Mad Scientist") end}, ['Fishman Karate'] = {Price = {Beli = 750000}, NextLevelRequirement = 300, Requirements = function() return true end, Buy = function(W) return BuyMelee('FishmanKarate', W, 'Water Kung-fu Teacher') end}, ['Dragon Claw'] = {Price = {Fragments = 1500}, NextLevelRequirement = 300, Requirements = function() return true end, Buy = function(W) return BuyMelee("DragonClaw", W, "Sabi") end}, ["Superhuman"] = {Price = {Beli = 3000000}, NextLevelRequirement = nil, Requirements = function() return true end, Buy = function(W) return BuyMelee("Superhuman", W, "Martial Arts Master") end}, ["Death Step"] = {Price = {Beli = 2500000, Fragments = 5000}, NextLevelRequirement = 400, Requirements = function() return true end, Buy = function(W) return BuyMelee("DeathStep", W, "Phoeyu, the Reformed") end}, ['Sharkman Karate'] = {Price = {Beli = 2500000, Fragments = 5000}, NextLevelRequirement = 400, Requirements = function() return true end, Buy = function(W) return BuyMelee('SharkmanKarate', W, 'Sharkman Teacher') end}, ['Electric Claw'] = {Price = {Beli = 2500000, Fragments = 5000}, NextLevelRequirement = 400, Requirements = function() return true end, Buy = function(W) return BuyMelee("ElectricClaw", W, 'Previous Hero') end}, ['Dragon Talon'] = {Price = {Beli = 2500000, Fragments = 5000}, NextLevelRequirement = 400, Requirements = function() return true end, Buy = function(W) return BuyMelee("DragonTalon", W, 'Uzoth') end}, ["Godhuman"] = {Price = {Beli = 5000000, Fragments = 5000}, NextLevelRequirement = 400, Requirements = function() return true end, Buy = function(W) return BuyMelee("Godhuman", W, 'Ancient Monk') end}}
+    DropItemData = {['Buddy Sword'] = {Sea = 3, Level = 1500, Boss = "Cake Queen"}, ['Canvander'] = {Sea = 3, Level = 1500, Boss = "Beautiful Pirate"}, ['Twin Hooks'] = {Sea = 3, Level = 1500, Boss = 'Captain Elephant'}, ["Venom Bow"] = {Sea = 3, Level = 1500, Boss = "Hydra Leader"}}
+    GodhumanMaterials = {['Fish Tail'] = {20, 3, {"Fishman Raider", "Fishman Captain"}, {'DeepForestIsland3', 1, 1775, 'Turtle Adventure Quest Giver'}}, ['Dragon Scale'] = {10, 3, {"Dragon Crew Warrior", "Dragon Crew Archer"}, {'DragonCrewQuest', 1, 1575, 'Dragon Crew Quest Giver'}}, ["Magma Ore"] = {20, 2, {'Magma Ninja'}, {"FireSideQuest", 1, 1100, "Fire Quest Giver"}}, ["Mystic Droplet"] = {10, 2, {'Sea Soldier', 'Water Fighter'}, {'ForgottenQuest', 2, 1425, 'Forgotten Quest Giver'}}}
+    SeaIndexes = {"Main", "Dressrosa", "Zou"}
+
+    -- [FIXED - QUAN TRỌNG] RefreshTasksData là first-match-wins: handler
+    -- nào Refresh() trả về giá trị TRƯỚC trong mảng này thắng NGAY, dừng
+    -- luôn (return ở dòng ~4051), không kiểm tra tiếp các handler sau.
+    -- "LevelFarm" đứng đầu + Refresh gần như LUÔN trả về (1/2/4, hiếm khi
+    -- nil) → nó thắng MỌI vòng, SpecialBossesTask/SwordBossTask/
+    -- CakePrinceTask/BossesTask phía sau KHÔNG BAO GIỜ được chạy tới —
+    -- đây mới là lý do thật "không thấy farm boss lấy item", không phải
+    -- do boss hiếm/config sai. Đưa hết boss-farming lên TRƯỚC LevelFarm:
+    -- boss nào đang farm được thì ưu tiên, hết boss mới rơi xuống LevelFarm.
+    -- [FIXED - XUNG ĐỘT] Lúc reorder ưu tiên boss-farming (lượt trước), tao
+    -- viết đè nguyên khối TasksOrder và LÀM MẤT 5 handler đã fix từ rất lâu
+    -- ("Saber","CursedDualKatana","SoulGuitar","EvoRace","RaceAwakening") —
+    -- y hệt bug gốc "registered nhưng không nằm trong TasksOrder = không
+    -- bao giờ chạy" mà tao đã tốn nhiều lượt để tìm ra và fix trước đó.
+    -- Khôi phục lại đầy đủ, vẫn giữ thứ tự ưu tiên boss-farming mới.
+    -- [FIXED - theo spec 2e/2g] RaidController tự check "fr > 5000 then
+    -- return nil" ĐÚNG rồi (dòng ~3005) — vấn đề là nó đứng SAU
+    -- CakePrinceTask/MeleesController/CDK trong TasksOrder (first-match-
+    -- wins), nên dù Fragments cạn, mấy handler "training" phía trước vẫn
+    -- thắng dispatch trước, RaidController không bao giờ được chạy tới.
+    -- Đưa RaidController/AutoRaidIce lên TRƯỚC các hoạt động "training"
+    -- (không khẩn cấp như boss hiếm) — Fragments thấp thì tự nhường,
+    -- Fragments đủ thì RaidController tự trả nil, rơi xuống training tiếp.
+    -- [FIXED - theo spec 2g] "MeleesController" đứng CUỐI danh sách khiến
+    -- LevelFarm (đứng rất trước, Refresh gần như luôn trả về giá trị) LUÔN
+    -- thắng dispatch — "melee đủ mastery thì dừng LevelFarm chuyển bước
+    -- tiếp theo" không bao giờ có cơ hội xảy ra vì MeleesController không
+    -- bao giờ được chạy tới. Đưa lên ngang hàng ưu tiên với CakePrinceTask
+    -- (trước LevelFarm) — mua melee/kiểm tra điều kiện tiên quyết giờ mới
+    -- thật sự preempt được leveling thường.
+    TasksOrder = {
+        "SpecialBossesTask", "SwordBossTask", "BossesTask",
+        "RaidController", "AutoRaidIce",
+        "CakePrinceTask", "MeleesController",
+        "LevelFarm", "Tushita", 'Yama',
+        "Saber", "CursedDualKatana", "SoulGuitar", "EvoRace", "RaceAwakening",
+        -- [FIXED - xung đột code phát hiện khi rà toàn bộ] Bỏ "Wenlocktoad"
+        -- và "ExpRedeem" khỏi danh sách này — cả 2 CÓ gọi :Register() (tạo
+        -- task slot rỗng) nhưng KHÔNG hề có RegisterMethod("Refresh"/"Start")
+        -- ở bất kỳ đâu trong file. Dispatcher (RefreshTasksData, có "if k
+        -- then" guard trước khi gọi) không crash vì việc này, nhưng mỗi tick
+        -- vẫn tốn 1 lần lookup FunctionsHandler[name] + kiểm tra Initalized
+        -- cho 2 task không bao giờ làm gì cả — dọn bỏ. Cũng bỏ luôn bản
+        -- "ThirdSeaPuzzle" bị lặp 2 lần (1 lần double-quote, 1 lần single-
+        -- quote) — hệ thống first-match-wins nên lần lặp lại chỉ tốn thêm
+        -- 1 lần gọi Refresh() y hệt trong CÙNG 1 tick, không có tác dụng gì.
+        'Trevor', "UtillyItemsActivitation", 'ColosseumPuzzle', "ThirdSeaPuzzle", "PirateRaid", "SecondSeaPuzzle", "CollectDrops"}
+    MaxLevel = 2800
+    placeId = game.PlaceId
+    if placeId == 85211729168715 or placeId == 2753915549 then
+        Sea = 'Main'
+        SeaIndex = 1
+    elseif placeId == 79091703265657 or placeId == 4442272183 then
+        Sea = "Dressrosa"
+        SeaIndex = 2
+    elseif placeId == 100117331123089 or placeId == 7449423635 then
+        Sea = "Zou"
+        SeaIndex = 3
+    end
+    Portals = ({{Vector3.new(-7894.6201171875, 5545.49169921875, -380.246346191406), Vector3.new(-4607.82275390625, 872.5422973632812, -1667.556884765625), Vector3.new(61163.8515625, 11.759522438049316, 1819.7841796875), Vector3.new(3876.280517578125, 35.10614013671875, -1939.3201904296875)}, {Vector3.new(-288.46246337890625, 306.130615234375, 597.9988403320312), Vector3.new(2284.912109375, 15.152046203613281, 905.48291015625), Vector3.new(923.21252441406, 126.9760055542, 32852.83203125), Vector3.new(-6508.5581054688, 89.034996032715, -132.83953857422)}, {}})[SeaIndex]
+    -- [FIXED] Bỏ 'Cake Prince' khỏi đây — giờ có CakePrinceTask riêng
+    -- (chủ động farm quái mở khoá + tự trigger summon), tránh 2 hệ thống
+    -- cùng đánh 1 boss gây xung đột combat
+    BossesOrder = {"Awakened Ice Admiral", "Tide Keeper", 'Deandre', "Urban", "Diablo", 'Soul Reaper'}
+    BossesOrderLevel = {['Awakened Ice Admiral'] = 700, ['Tide Keeper'] = 700, ['Deandre'] = 1500, ['Urban'] = 1500, ['Diablo'] = 1500, ['Soul Reaper'] = 1500}
+    BossesOrderWL = {["Deandre"] = 1500, ["Urban"] = 1500, ["Diablo"] = 1500, ['Don Swan'] = 1100, ["Awakened Ice Admiral"] = 700, ['Tide Keeper'] = 700}
+    -- [ADDED] Katakuri — KHÔNG tìm thấy trong file nat kaitun hay bất kỳ
+    -- nguồn nào tao có, nên đây là giá trị đoán an toàn (level 2150, giống
+    -- mức các boss cuối game khác). Nếu sai level thật, báo tao sửa lại.
+    -- [FIXED] "Hải Tặc Đào Hoa" = "Beautiful Pirates" — trước đây tao đoán
+    -- nhầm là Cake Prince, boss man đã sửa lại đúng tên. Toạ độ lấy từ
+    -- file bypass-teleport verified (Vector3.new(5319, 23, -93)) — level
+    -- chưa có nguồn xác nhận, tạm để 1500 giống tier Deandre/Urban/Diablo,
+    -- báo tao nếu sai.
+    SpecialBossesOrder = {["Core"] = 700, ['Darkbeard'] = 700, ["Katakuri"] = 2150, ["Beautiful Pirates"] = 1500}
+    -- [NEW - theo spec] Toạ độ farm Bones ở Haunted Castle, dùng chung cho
+    -- Fire Essence (Dragon Talon), Hallow Essence (CDK), và Yama/Tushita
+    HAUNTED_CASTLE_BONES_CF = CFrame.new(-8817.880859375, 191.16761779785, 6298.6557617188)
+    BeautifulPiratesCF = CFrame.new(5319, 23, -93)
+
+    -- Config.Sword và Config.BossWeapons giờ nằm ở đầu file (khối Config = {...})
+    -- theo đúng yêu cầu "để config lên trên cùng" — không định nghĩa lại ở đây nữa
+    BlankTablets = {"Segment6", 'Segment2', 'Segment8', "Segment9", 'Segment5'}
+    Trophy = {["Segment1"] = "Trophy1", ["Segment3"] = "Trophy2", ['Segment4'] = "Trophy3", ['Segment7'] = "Trophy4", ["Segment10"] = "Trophy5"}
+    Pipes = {['Part1'] = 'Really black', ['Part2'] = 'Really black', ["Part3"] = "Dusty Rose", ['Part4'] = "Storm blue", ['Part5'] = 'Really black', ['Part6'] = "Parsley green", ["Part7"] = 'Really black', ["Part8"] = "Dusty Rose", ["Part9"] = 'Really black', ['Part10'] = 'Storm blue'}
+    function GenerateUUID()
+        local W = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+        return string.gsub("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", '[xy]', function(W)
+            local W = (Idx == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
+            return string.format('%x', W)
+        end)
+    end
+    function CheckIsPlayerAlive(W) W = W or LocalPlayer; return W and W.Character and W.Character.Humanoid and W.Character.HumanoidRootPart and W.Character.Head and W.Character.Humanoid.Health > 0 end
+    function ConvertTo(W, a) return W.new(a.X, a.Y, a.Z) end
+    function CaculateDistance(W, a)
+        if not W then return 0 end
+        a = a or game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+        local h, X = ConvertTo(Vector3, W), ConvertTo(Vector3, a)
+        return (h - X).magnitude
+    end
+    function DispTime(W, a)
+        W = tonumber(W)
+        if not W then return "[err]" end
+        local h = math.floor(W / 86400)
+        local X = math.floor(math.fmod(W, 86400) / 3600)
+        local w = math.floor(math.fmod(W, 3600) / 60)
+        local D = math.floor(math.fmod(W, 60))
+        if a then return (h .. "day, " .. X .. "hrs, " .. w .. "min, " .. D .. 'sec.') end
+        return (h .. 'day, ' .. X .. "hrs.")
+    end
+    function GetCurrentDateTime()
+        local W = os.date("*t")
+        local a = W.hour
+        local h = W.min
+        local X = W.day
+        local w = W.month
+        local D = W.year
+        local y = W.wday
+        local W = string.format('%02d:%02d ', a, h)
+        local a = {'Sun', "Mon", 'Tue', "Wed", 'Thu', "Fri", 'Sat'}
+        local h = a[y]
+        local a = {"Jan", "Feb", "Mar", 'Apr', "May", 'Jun', "Jul", 'Aug', 'Sep', "Oct", 'Nov', "Dec"}
+        local y = a[w]
+        local a = string.format('%s, %s %d %d', h, y, X, D)
+        return W .. a
+    end
+    function RandomArguments(...) local W = {...}; return W[math.random(0, #W)] end
+    function RoundVector3Down(W) return Vector3.new(math.floor(W.X / 10) * 10, math.floor(W.Y / 10) * 10, math.floor(W.Z / 10) * 10) end
+
+    -- ============================================================
+    -- XOAY VÒNG TRÒN CŨ (DÙNG TICK)
+    -- ============================================================
+    -- [FIXED] W_angle/lastChange chưa từng được khởi tạo — gọi hàm này lần
+    -- đầu sẽ crash ("attempt to compare nil with number") vì so sánh
+    -- W_angle (nil) > 50000. Khởi tạo trước khi dùng.
+    W_angle = W_angle or 0
+    lastChange = lastChange or tick()
+
+    -- [UPDATED] Đổi tốc độ theo bản boss man đưa: 0.01s / 20° (mượt hơn
+    -- bản cũ 0.4s / 80°, xoay liên tục thay vì giật cục)
+    CaculateCircreDirection = function(a)
+        if W_angle > 50000 then W_angle = 60 end
+        W_angle = W_angle + ((tick() - lastChange) > 0.01 and 20 or 0)
+        if tick() - lastChange > 0.01 then lastChange = tick() end
+        local h = a + Vector3.new(math.cos(math.rad(W_angle)) * 40, 0, math.sin(math.rad(W_angle)) * 40)
+        return CFrame.new(RoundVector3Down(h.p))
+    end
+
+    function GetMonAsSortedRange()
+        local W = {}
+        table.foreach(Services.Workspace.Enemies:GetChildren(), function(a, a)
+            if a and a:FindFirstChild('Humanoid') and a:FindFirstChild("HumanoidRootPart") and a.Humanoid.Health > 0 then
+                table.insert(W, a)
+            end
+        end)
+        table.foreach(game.ReplicatedStorage:GetChildren(), function(a, a)
+            if a and a:FindFirstChild('Humanoid') and a:FindFirstChild("HumanoidRootPart") and a.Humanoid.Health > 0 then
+                table.insert(W, a)
+            end
+        end)
+        table.sort(W, function(a, h) return CaculateDistance(a.HumanoidRootPart.CFrame) < CaculateDistance(h.HumanoidRootPart.CFrame) end)
+        return W
+    end
+    print(1.5)
+    function GetMeleeIdByName(W) for a, h in MeleesTable do if h == W then return MeleesId[a] end end end
+    function FindMeleeNPC(npcName)
+        for _, npc in pairs(workspace.NPCs:GetChildren()) do
+            if npc.Name == npcName and npc:FindFirstChild("HumanoidRootPart") then
+                return npc.HumanoidRootPart.Position
+            end
+        end
+        return nil
+    end
+    function getpos(W)
+        for a, a in game:GetService("ReplicatedStorage").NPCs:GetChildren() do if a.Name == W then return a.HumanoidRootPart.CFrame end end
+        for a, a in workspace.NPCs:GetChildren() do if a.Name == W then return a.HumanoidRootPart.CFrame end end
+    end
+
+    -- ============================================================
+    -- HÀM HỖ TRỢ AUTO FULL MELEE
+    -- ============================================================
+    function GetBP(meleeName)
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        if bp and bp:FindFirstChild(meleeName) then return bp[meleeName] end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild(meleeName) then return char[meleeName] end
+        return nil
+    end
+
+    function GetM(matName)
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        if not bp then return 0 end
+        for _, v in pairs(bp:GetChildren()) do
+            if v.Name == matName and v:FindFirstChild("Count") then
+                return v.Count.Value
+            end
+        end
+        return 0
+    end
+
+    function GetConnectionEnemies(enemyName)
+        local nearest, dist = nil, math.huge
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return nil end
+        for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+            if enemy.Name == enemyName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                local root = enemy:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local d = (root.Position - hrp.Position).Magnitude
+                    if d < dist then
+                        dist = d
+                        nearest = enemy
+                    end
+                end
+            end
+        end
+        return nearest
+    end
+
+    function BuyMelee(W, a)
+        if W == "DragonClaw" then
+            if workspace.NPCs:FindFirstChild('Sabi') then
+                if a then
+                    if type(Remotes.CommF_:InvokeServer("BlackbeardReward", 'DragonClaw', '1') == 1) == "number" and Remotes.CommF_:InvokeServer('BlackbeardReward', 'DragonClaw', '1') == 1 == 1 and not table.find(J, W) then table.insert(J, W) end
+                    return Remotes.CommF_:InvokeServer("BlackbeardReward", "DragonClaw", "1")
+                end
+                return Remotes.CommF_:InvokeServer('BlackbeardReward', "DragonClaw", '2')
+            end
+        end
+        if W == "Godhuman" then
+            -- [FIXED - verified từ message_10] BuyGodhuman cần gọi 2 LẦN
+            -- (true, rồi không tham số) — generic 1-lần bên dưới không đủ,
+            -- y hệt pattern Dragon Talon đã verify trước đó.
+            Remotes.CommF_:InvokeServer("BuyGodhuman", true)
+            local result = Remotes.CommF_:InvokeServer("BuyGodhuman")
+            if not table.find(J, W) then table.insert(J, W) end
+            return result
+        end
+        if a then
+            local a = Remotes.CommF_:InvokeServer('Buy' .. W, true)
+            print("Response_", a == 1, typeof(a))
+            if type(a) == 'number' and not table.find(J, W) then table.insert(J, W) end
+            return a == 1
+        end
+        return Remotes.CommF_:InvokeServer("Buy" .. W)
+    end
+
+    function SendKey(J, W)
+        (function()
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, J, false, game)
+            task.wait(W)
+            game:GetService('VirtualInputManager'):SendKeyEvent(false, J, false, game)
+        end)()
+    end
+
+    function FruitIdToName(J)
+        local W = string.match(J, "((%u)[^%-]+)$")
+        return W .. ' Fruit'
+    end
+    function Split(J, W)
+        if W == nil then W = "%s" end
+        local a = {}
+        for h in string.gmatch(J, '([^' .. W .. ']+)') do table.insert(a, h) end
+        return a
+    end
+    function FruitNameToId(J)
+        local W = Split(J)[1]
+        return W .. '-' .. W
+    end
+
+    -- ============================================================
+    -- J QUESTS
+    -- ============================================================
+    local J = {CurrentLevel = 2, DoubleQuest = true, CurrentQuests = {}, BlacklistedQuestIds = {BartiloQuest = 1, CitizenQuest = 1, Trainees = 1, MarineQuest = 1, ImpelQuest = 1}}
+    local W = require(game.ReplicatedStorage.GuideModule).Data.NPCList
+    repeat task.wait() until game.Players.LocalPlayer.DataLoaded and ScriptStorage
+    J.Quests = require(game.ReplicatedStorage.Quests)
+    function J.Set(W, a, h) W[a] = h end
+    function J.RefreshQuest(W)
+        local timeout = os.time()
+        while not ScriptStorage.PlayerData.Level do
+            task.wait(1)
+            print('[ Debug ] Waiting for LocalPlayer datas.')
+            if os.time() - timeout > 30 then
+                print('[ Debug ] Timeout waiting for player data, skipping quest refresh')
+                return
+            end
+        end
+        local a = 0
+        local h
+        for X, w in J.Quests do
+            if not J.BlacklistedQuestIds[X] then
+                if (w[1].LevelReq >= a and w[1].LevelReq <= ScriptStorage.PlayerData.Level) then
+                    a = w[1].LevelReq
+                    h = w
+                    W.CurrentQuestId = X
+                    if ScriptStorage.PlayerData.Level >= 1500 and SeaIndex == 2 and X == 'ForgottenQuest' then break end
+                end
+            end
+        end
+        local a = h[#h]
+        for X, X in a.Task do if X == 1 then table.remove(h, #h) end end
+        for a, X in require(game.ReplicatedStorage.GuideModule).Data.NPCList do
+            for w, w in X.Levels do if w == h[#h].LevelReq then W.CurrentNpc = a.CFrame end end
+        end
+        W.CurrentQuests = h
+    end
+    function J.GetCurrentQuest(W)
+        local a = W.CurrentQuests[W.CurrentLevel] and W.CurrentQuests[W.CurrentLevel].LevelReq <= ScriptStorage.PlayerData.Level and W.CurrentLevel or 1
+        for h in W.CurrentQuests[a].Task do return h, W.CurrentNpc, W.CurrentQuestId, a, W.CurrentQuests[a].Name end
+    end
+    function J.MarkAsCompleted(W) W.CurrentLevel = W.CurrentLevel == 2 and 1 or 2 end
+    function J.AbandonQuest()
+        print('Abandon Quest')
+        Remotes.CommF_:InvokeServer("AbandonQuest")
+    end
+    function J.GetCurrentClaimQuest(W)
+        local W = game.Players.LocalPlayer.PlayerGui.Main.Quest.Visible and game.Players.LocalPlayer.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text:gsub("%s*Defeat%s*(%d*)%s*(.-)%s*%b()", '%2')
+        return (type(W) == "string" and string.gsub(W, "Military ", "Mil. ") or W), game.Players.LocalPlayer.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text
+    end
+    function J.StartQuest(W, a)
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer('ColorsDealer', "2")
+        return Remotes.CommF_:InvokeServer("StartQuest", W, a)
+    end
+
+    -- ============================================================
+    -- SCRIPTSTORAGE MOB REGIONS
+    -- ============================================================
+    ScriptStorage.MobRegions = {}
+    for W, W in game:GetService("ReplicatedStorage").FortBuilderReplicatedSpawnPositionsFolder:GetChildren() do
+        ScriptStorage.MobRegions[tostring(W)] = ScriptStorage.MobRegions[tostring(W)] or {}
+        table.insert(ScriptStorage.MobRegions[tostring(W)], W.CFrame)
+    end
+
+    -- ============================================================
+    -- TWEEN CONTROLLER
+    -- ============================================================
+    TweenController = {}
+
+    -- [ADDED - theo yêu cầu boss man: "dùng tween của file red magic hub"]
+    -- Port block-tween + sync loop từ main_red_magic_beta.txt — tween 1
+    -- Part vô hình ("block") thay vì tween thẳng HumanoidRootPart, nhân
+    -- vật tự "bám" theo block khi đang farm (getgenv().OnFarm), tránh anti-
+    -- cheat detect việc set CFrame của HRP trực tiếp mỗi frame.
+    local block = Instance.new("Part", workspace)
+    block.Size = Vector3.new(1, 1, 1)
+    block.Name = "Rip_Indra"
+    block.Anchored = true
+    block.CanCollide = false
+    block.CanTouch = false
+    block.Transparency = 1
+    do
+        local blockfind = workspace:FindFirstChild(block.Name)
+        if blockfind and blockfind ~= block then blockfind:Destroy() end
+    end
+    task.spawn(function()
+        while task.wait() do
+            if block and block.Parent == workspace then
+                getgenv().OnFarm = shouldTween and true or false
+            else
+                getgenv().OnFarm = false
+            end
+        end
+    end)
+    task.spawn(function()
+        local a = game.Players.LocalPlayer
+        repeat task.wait() until a.Character and a.Character.PrimaryPart
+        block.CFrame = a.Character.PrimaryPart.CFrame
+        while task.wait() do
+            pcall(function()
+                if getgenv().OnFarm then
+                    if block and block.Parent == workspace then
+                        local b = a.Character and a.Character.PrimaryPart
+                        if b and (b.Position - block.Position).Magnitude <= 200 then
+                            b.CFrame = block.CFrame
+                        else
+                            block.CFrame = b.CFrame
+                        end
+                    end
+                    local c = a.Character
+                    if c then
+                        for _, e in pairs(c:GetChildren()) do
+                            if e:IsA("BasePart") then e.CanCollide = false end
+                        end
+                    end
+                else
+                    local c = a.Character
+                    if c then
+                        for _, e in pairs(c:GetChildren()) do
+                            if e:IsA("BasePart") then e.CanCollide = true end
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+    local W = 0
+    local W = {}
+    for a, a in game.ReplicatedStorage.NPCs:GetChildren() do if a.Name == 'Set Home Point' then table.insert(W, a:GetModelCFrame()) end end
+    function TweenController.Update()
+        local a = game.Players.LocalPlayer.Character.HumanoidRootPart
+        HumanoidRootPart = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+        if CaculateDistance(a.CFrame) > 250 then
+            pcall(function() TweenInstance:Cancel() end)
+            TweenDebounce = true
+            a.CFrame = HumanoidRootPart.CFrame
+            TweenDebounce = false
+        end
+        HumanoidRootPart.CFrame = a.CFrame + Vector3.new(0, 3, 0)
+    end
+    function GetPortal(a)
+        local h, X = 9e9, nil
+        for w, w in Portals do
+            local D = CaculateDistance(w, a)
+            if D < (CaculateDistance(a) - 300) and D < h then
+                h = D
+                X = w
+            end
+        end
+        if X then
+            Remotes.CommF_:InvokeServer("requestEntrance", X)
+            return task.wait()
+        end
+    end
+    function GetEntries(a)
+        local h, X = 9e9, nil
+        for w, w in W do
+            local W = CaculateDistance(w, a)
+            if W < (CaculateDistance(a) - 700) and W < h then
+                h = W
+                X = w
+            end
+        end
+        if X then if os.time() - 0 > 30 then for W = 1, 10, 1 do task.wait() end end end
+    end
+    function TweenController.Tween2(W, a)
+        TweenInstance2 = Services.TweenService:Create(W, TweenInfo.new(CaculateDistance(W.CFrame, a) / 50, Enum.EasingStyle.Linear), {CFrame = ConvertTo(CFrame, a) - Vector3.new(0, 0, 0)})
+        TweenInstance2:Play()
+    end
+    function CheckItem(itemName)
+        local bp = game.Players.LocalPlayer:FindFirstChild('Backpack')
+        for _, v in next, bp and bp:GetChildren() or {} do
+            if v:IsA('Tool') and (v.Name == itemName or string.find(v.Name, itemName)) then return v end
+        end
+        local char = game.Players.LocalPlayer.Character
+        if char then
+            for _, v in next, char:GetChildren() do
+                if v:IsA('Tool') and (v.Name == itemName or string.find(v.Name, itemName)) then return v end
+            end
+        end
+        return false
+    end
+
+    -- [FIXED - theo yêu cầu boss man: "bỏ bypass teleport"] Đã xoá hẳn toàn
+    -- bộ cụm hàm bypass-teleport (CheckLegendaryItems/InArea/GetSpawnPoint/
+    -- CanBypassTeleport/GetBypassCFrame/BypassTP) — kiểm tra kỹ trước khi
+    -- xoá: không còn nơi nào khác trong file gọi các hàm này (cả 2 điểm
+    -- gọi BypassTP() duy nhất, trong TweenController.Create và
+    -- _SgCollectChest, đã được thay bằng tween thường ở trên).
+
+    -- ============================================================
+    -- [FIXED] TWEEN CONTROLLER - GIỮ NGUYÊN 200/190
+    -- ============================================================
+    function TweenController.Create(W)
+        if not W or TweenDebounce then return end
+        local a = typeof(W) ~= 'CFrame' and ConvertTo(CFrame, W) or W
+        if TweenInstance then pcall(function() TweenInstance:Cancel() end) end
+        local character = game.Players.LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        -- [FIXED - theo yêu cầu boss man: "bỏ bypass teleport"] Đã xoá hẳn
+        -- nhánh BypassTP (dist>=4000 → đổi spawn point) — không còn dùng
+        -- cơ chế bypass qua spawn point nữa, mọi khoảng cách đều tween bình
+        -- thường qua block (từ main_red_magic_beta.txt).
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+        local head = character:WaitForChild("Head")
+        if not head:FindFirstChild("eltrul") then
+            local bv = Instance.new('BodyVelocity')
+            bv.Name = "eltrul"
+            bv.MaxForce = Vector3.new(0, math.huge, 0)
+            bv.Velocity = Vector3.zero
+            bv.Parent = head
+        end
+        if CaculateDistance(a) > 500 then
+            if SeaIndex == 3 and not ScriptStorage.Backpack['Valkyrie Helm'] then
+            elseif SeaIndex ~= 3 then
+                GetPortal(a)
+            end
+        end
+        if CaculateDistance(Vector3.new(11256, -2138.0, 9888), a) < (CaculateDistance(a) - 700) and SeaIndex == 3 then
+            local gatePos = CFrame.new(-16269.0, 23, 1371)
+            if CaculateDistance(gatePos) > 60 then
+                TweenController.Create(gatePos)
+                task.wait(1)
+                return
+            end
+            local net = require(game.ReplicatedStorage.Modules.Net)
+            net:RemoteFunction('SubmarineWorkerSpeak'):InvokeServer('TravelToSubmergedIsland')
+        end
+
+        a = CFrame.new(a.Position)
+        local dist = CaculateDistance(hrp.CFrame, a)
+
+        if dist <= 5 then
+            hrp.CFrame = a
+            block.CFrame = a
+            return
+        end
+
+        -- [FIXED - theo yêu cầu boss man: "chỉnh lên 160 cho nhanh ko vượt
+        -- quá 160"] Bỏ hẳn bảng 110/100 cũ — dùng 1 mức tốc độ CỐ ĐỊNH 160
+        -- (giống tween của main_red_magic_beta.txt, chỉ đổi số chia 300 →
+        -- 160 để nhanh hơn), không có mức nào vượt quá con số này.
+        local divisor = 160
+        local duration = dist / divisor
+
+        -- [FIXED - port tween từ main_red_magic_beta.txt] Tween "block"
+        -- (Part vô hình) thay vì tween thẳng hrp — nhân vật tự bám theo
+        -- block qua vòng lặp sync đã thêm ở trên (getgenv().OnFarm).
+        shouldTween = true
+        TweenInstance = Services.TweenService:Create(block, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = a})
+        TweenInstance:Play()
+        task.spawn(function()
+            while TweenInstance and TweenInstance.PlaybackState == Enum.PlaybackState.Playing do
+                if not shouldTween then
+                    pcall(function() TweenInstance:Cancel() end)
+                    break
+                end
+                task.wait(0.1)
+            end
+            shouldTween = false
+        end)
+    end
+
+    -- ============================================================
+    -- FAST ATTACK & EQUIP WEAPON (LẤY TỪ TEST.TXT - GIỮ NGUYÊN)
+    -- ============================================================
+    local W = {}
+    local a = game:GetService('Players')
+    local h = game:GetService("RunService")
+    local h = game:GetService('ReplicatedStorage')
+    local X = game:GetService("Workspace")
+    local X = game:GetService("VirtualInputManager")
+    local X = a.LocalPlayer
+    local X = h:WaitForChild('Modules')
+    local w = X:WaitForChild("Net")
+    local X = w:WaitForChild("RE/RegisterAttack")
+    local X = w:WaitForChild('RE/RegisterHit')
+    local X = w:WaitForChild('RE/ShootGunEvent')
+    local X = h:WaitForChild("Remotes"):WaitForChild('Validator2')
+    local h = game.ReplicatedStorage.Modules
+    local X = h.Net
+    local h, h = X:WaitForChild("RE/RegisterHit"), X:WaitForChild('RE/RegisterAttack')
+    local h = {}
+    function GetAllBladeHits()
+        bladehits = {}
+        for X, X in pairs(workspace.Enemies:GetChildren()) do
+            if X:FindFirstChild('Humanoid') and X:FindFirstChild('HumanoidRootPart') and X.Humanoid.Health > 0 and (X.HumanoidRootPart.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude <= 65 then
+                table.insert(bladehits, X)
+            end
+        end
+        return bladehits
+    end
+    function Getplayerhit()
+        bladehits = {}
+        for X, X in pairs(workspace.Characters:GetChildren()) do
+            if X.Name ~= game.Players.LocalPlayer.Name and X:FindFirstChild('Humanoid') and X:FindFirstChild('HumanoidRootPart') and X.Humanoid.Health > 0 and (X.HumanoidRootPart.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude <= 65 then
+                table.insert(bladehits, X)
+            end
+        end
+        return bladehits
+    end
+    local X = (Services.ReplicatedStorage.Modules.Net)
+    local w = require(X):RemoteEvent("RegisterAttack", true)
+    local D = require(X):RemoteEvent("RegisterHit", true)
+    function h:Attack()
+        local X = {}
+        for y, y in pairs(GetAllBladeHits()) do table.insert(X, y) end
+        for y, y in pairs(Getplayerhit()) do table.insert(X, y) end
+        if #X == 0 then return end
+        local y = {[1] = nil, [2] = {}, [4] = "078da5141"}
+        for L, L in pairs(X) do
+            w:FireServer(0)
+            if not y[1] then y[1] = L.Head end
+            table.insert(y[2], {[1] = L, [2] = L.HumanoidRootPart})
+            table.insert(y[2], L)
+        end
+        D:FireServer(unpack(y))
+    end
+    task.spawn(function()
+        while task.wait(.06) do if _G.FastAttack == os.time() then pcall(function() h:Attack() end) end end
+    end)
+function W.Attack(target) pcall(function() _G.FastAttack = os.time() end) end
+
+    CombatController = {GRAB = false, GRAB_DISTANCE = SeaIndex == 1 and 250 or 350, MAX_ATTACK_DURATION = 2, MAX_ATTACK_DURATION_2 = 60, LEVITATE_TIME = 0, CurrentIndex = 1}
+
+    -- ============================================================
+    -- [NEW] BRING MOBS — trích từ Maru Hub, boss man yêu cầu chỉnh
+    -- bringRange 888 → 300 (giảm cho gọn, đỡ kéo quái từ quá xa)
+    -- Config.BringMobs bật/tắt; PosMon/Mon set từ bên ngoài lúc cần kéo
+    -- quái về 1 điểm cụ thể (VD: farm quest cần gom quái).
+    -- KHÔNG lock quái mà CombatController đang target dở — tránh xung đột
+    -- 2 hệ thống cùng giữ 1 con quái theo 2 cách khác nhau.
+    -- ============================================================
+    getgenv().BringMonster = getgenv().BringMonster or false
+    PosMon = PosMon or nil
+    Mon = Mon or nil
+
+    BringEnemy = function()
+        pcall(function()
+            if not Config.BringMobs or not getgenv().BringMonster then return end
+            if not PosMon then return end
+
+            local _char = LocalPlayer.Character
+            if not _char then return end
+            local _root = _char:FindFirstChild("HumanoidRootPart")
+            if not _root then return end
+
+            local targetCF = typeof(PosMon) == "CFrame" and PosMon or CFrame.new(PosMon)
+            local pinCF     = targetCF * CFrame.new(0, 3, 0)
+            local maxPull   = 20
+            local pulled    = 0
+            local bringRange = 300 -- [FIXED] 888 → 300 theo yêu cầu boss man
+
+            local targetName = (Mon and Mon ~= "") and Mon or nil
+
+            local function LockMob(v, hrp, hum)
+                hrp.CFrame     = pinCF
+                hrp.CanCollide = false
+
+                local head = v:FindFirstChild("Head")
+                if head then
+                    head.CFrame     = pinCF * CFrame.new(0, 2, 0)
+                    head.CanCollide = false
+                end
+
+                hum.WalkSpeed  = 0
+                hum.JumpPower  = 0
+                hum.AutoRotate = false
+
+                local anim = hum:FindFirstChildOfClass("Animator")
+                if anim then anim:Destroy() end
+
+                for _, t in ipairs(v:GetChildren()) do
+                    if t:IsA("Script") or t:IsA("LocalScript") then
+                        t.Disabled = true
+                    end
+                end
+
+                if hrp:FindFirstChild("_Lock") then
+                    hrp._Lock.Velocity = Vector3.new(0, 0, 0)
+                    hrp._Lock.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                else
+                    local bv    = Instance.new("BodyVelocity")
+                    bv.Name     = "_Lock"
+                    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                    bv.Parent   = hrp
+                end
+
+                pcall(function() sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge) end)
+                hum:ChangeState(11)
+            end
+
+            local enemyFolder = workspace:FindFirstChild("Enemies")
+            if enemyFolder then
+                for _, v in ipairs(enemyFolder:GetChildren()) do
+                    if pulled >= maxPull then break end
+                    if targetName and v.Name ~= targetName then continue end
+                    -- (Đã bỏ check "đừng lock quái CombatController đang đánh" —
+                    -- field CombatController.CurrentTarget không tồn tại thật
+                    -- trong code, check đó luôn so với nil, không bảo vệ được
+                    -- gì. Thực tế lock (đứng im) không cản CombatController
+                    -- gây damage, nên không cần check này.)
+
+                    local hrp = v:FindFirstChild("HumanoidRootPart")
+                    local hum = v:FindFirstChild("Humanoid")
+                    if not hrp or not hum or hum.Health <= 0 then continue end
+                    if (hrp.Position - _root.Position).Magnitude > bringRange then continue end
+
+                    LockMob(v, hrp, hum)
+                    pulled = pulled + 1
+                end
+            end
+        end)
+    end
+
+    task.spawn(function()
+        while task.wait(0.05) do
+            BringEnemy()
+        end
+    end)
+
+
+    LastFound = os.time()
+    function CombatController.Grab(mobName)
+        pcall(sethiddenproperty, game.Players.LocalPlayer, 'SimulationRadius', math.huge)
+        if not CombatController.GRAB or GrabDebounce == os.time() then return end
+        GrabDebounce = os.time()
+        if not MonResult or not MonResult:FindFirstChild('HumanoidRootPart') then return end
+        local targetPos = MonResult.HumanoidRootPart.Position
+        local AreaMob = false
+        for _, enemy in Services.Workspace.Enemies:GetChildren() do
+            if enemy ~= MonResult and enemy.Name == mobName then
+                local hum = enemy:FindFirstChildOfClass("Humanoid")
+                local root = enemy:FindFirstChild("HumanoidRootPart")
+                if hum and root and hum.Health > 0 then
+                    local dist = (root.Position - targetPos).Magnitude
+                    if dist <= 3000 then
+                        local bv = root:FindFirstChild('FarmingVelocity')
+                        if not bv then
+                            bv = Instance.new('BodyVelocity')
+                            bv.Name = 'FarmingVelocity'
+                            bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                            bv.Velocity = Vector3.zero
+                            bv.Parent = root
+                        end
+                        if dist <= 10 then
+                            AreaMob = true
+                        end
+                        if not AreaMob and (not isnetworkowner or pcall(isnetworkowner, root)) then
+                            root.CFrame = MonResult.HumanoidRootPart.CFrame
+                        end
+                        enemy:SetAttribute('IsGrabbed', true)
+                    end
+                end
+            end
+        end
+    end
+    function Sort1(entity) return entity and entity:FindFirstChild("HumanoidRootPart") and math.floor(CaculateDistance(entity.HumanoidRootPart.CFrame)) end
+    function CombatController.Search(names)
+        local candidates = {}
+        local anyFound = false
+        for _, entity in GetMonAsSortedRange() do
+            if table.find(names, entity.Name) and entity:FindFirstChild("Humanoid") and entity.Humanoid.Health > 0 then
+                if (entity:GetAttribute('FailureCount') or 0) < 3 then
+                    anyFound = true
+                    table.insert(candidates, entity)
+                end
+            end
+        end
+        table.sort(candidates, function(entity, other) return Sort1(entity) < Sort1(other) end)
+        if anyFound then
+            local best = candidates[1]
+            return best
+        end
+        for _, npcName in names do
+            local npc = game.ReplicatedStorage:FindFirstChild(npcName)
+            if npc then return npc end
+        end
+    end
+    function CombatController.Attack(h, X, w, D)
+        if ScriptStorage.Tools["Sweet Chalice"] and getsenv(game.ReplicatedStorage.GuideModule)["_G"]['InCombat'] then
+            pcall(function() if TweenInstance then TweenInstance:Cancel() end end) -- [FIXED] không tween về (0,0,0) khi Sweet Chalice InCombat
+            return
+        end
+        sethiddenproperty(game.Players.LocalPlayer, 'SimulationRadius', math.huge)
+        h = type(h) == "string" and {h} or (h or {})
+        for y, L in (h) do
+            local b = tostring(L)
+            if b == 'Deandre' or b == "Urban" or b == "Diablo" and (os.time() - (LastFire12 or 0)) > 180 then
+                LastFire12 = os.time()
+                Remotes.CommF_:InvokeServer("EliteHunter")
+            end
+            if X then
+                local b = GetMonAsSortedRange()[1]
+                local C = b and b:FindFirstChild('HumanoidRootPart') and b.HumanoidRootPart.Position
+                if C and CaculateDistance(C) < w then MonResult = b end
+            else
+                MonResult = CombatController.Search(h)
+            end
+            if MonResult then
+                LastFound = os.time()
+                local h, w = 0, os.time()
+                SetTask('SubTask', '⚔️ Attacking ' .. tostring(MonResult.Name))
+                local w, b = 0, os.time()
+                while task.wait() do
+                    if _G.Stop then return end
+                    if ScriptStorage.Tools["Sweet Chalice"] and getsenv(game.ReplicatedStorage.GuideModule)["_G"]["InCombat"] then
+                        pcall(function() if TweenInstance then TweenInstance:Cancel() end end) -- [FIXED] không tween về (0,0,0) khi Sweet Chalice InCombat
+                        return
+                    end
+                    local C = MonResult:FindFirstChild('Humanoid')
+                    local p = MonResult:FindFirstChild('HumanoidRootPart')
+                    if not C or C.Health <= 0 then
+                        if MonResult.Name == "Don Swan" then Storage:Set("SwanDefeated", true) end
+                        break
+                    end
+                    TweenController.Create(CaculateCircreDirection(p.CFrame) + Vector3.new(0, 35, 0))
+                    if CaculateDistance(p.Position + Vector3.new(0, 35, 0)) < 150 then
+                        y = D and D()
+                        CombatController.Grab(L or '')
+                        if MonResult.Name ~= "Core" then
+                            if ScriptStorage.PlayerData.Level > 100 and w >= CombatController.MAX_ATTACK_DURATION_2 and C.Health - C.MaxHealth == 0 then
+                                SetTask('SubTask', 'Hop Server - Mob Health Unchanged ( ' .. C.Health .. ' / ' .. C.MaxHealth .. ')')
+                                alert("stuck", "Mob health unchanged")
+                                _G.Stop = true
+                                game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", game.JobId)
+                            end
+                            if h >= CombatController.MAX_ATTACK_DURATION and C.Health - C.MaxHealth == 0 then
+                                h = 0
+                                local D = MonResult:GetAttribute('OldPosition')
+                                if D then
+                                    MonResult:SetPrimaryPartCFrame(CFrame.new(D))
+                                    MonResult:SetAttribute('IgnoreGrab', true)
+                                    MonResult:SetAttribute('FailureCount', (MonResult:GetAttribute("FailureCount") or 0) + 1)
+                                    alert('Failed to attack', "Returning to the old posiiton ( #" .. MonResult:GetAttribute("FailureCount") .. " )")
+                                    MonResult.HumanoidRootPart.CFrame = (CFrame.new(D))
+                                    task.wait()
+                                    return
+                                end
+                            end
+                        end
+                        if (FarmFruitMastery or math.huge) - os.time() < 3 and math.floor(MonResult.Humanoid.Health / MonResult.Humanoid.MaxHealth * 100) < 30 and not FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call() then
+                            TweenController.Create((p.CFrame) + Vector3.new(0, 25, 0))
+                            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call('Blox Fruit')
+                            LockAimPositionTo(MonResult.HumanoidRootPart.CFrame.p)
+                            local D = {'Z', 'X', "C", 'V'}
+                            local y = D[math.random(1, #D)]
+                            SendKey(y, .31)
+                        else
+                            -- [FIXED] Ưu tiên dùng _G.SelectWeapon nếu có
+                            if _G.SelectWeapon and CheckItem(_G.SelectWeapon) then
+                                FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call(_G.SelectWeapon)
+                            else
+                                FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call(ScriptStorage.ForceToUseSword and 'Sword' or "Melee")
+                            end
+                        end
+                        W:Attack(MonResult)
+                        if os.time() ~= b then
+                            b = os.time()
+                            h = h + 1
+                            w = w + 1
+                        end
+                        if h > 30 and MonResult.Name ~= "Core" then
+                            alert("Take more than 30s to attack, canceling")
+                            break
+                        end
+                    end
+                end
+            elseif not X then
+                if (os.time() - LastFound) > 200 then
+                    alert('MeyyHub', 'Error while farming, rejoin')
+                    game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", game.JobId)
+                    return
+                end
+                local h = ScriptStorage.MobRegions[L]
+                if not h then
+                    local X = Services.Workspace.Enemies:FindFirstChild(L) or game.ReplicatedStorage:FindFirstChild(L)
+                    h = X and {X:GetPrimaryPartCFrame().p}
+                end
+                if not h then
+                    Report('[ Game data error ] Mob with name ' .. tostring(L) .. ' have no spawn region datas')
+                    return
+                end
+                local X
+                if not h[CombatController.CurrentIndex] then CombatController.CurrentIndex = 1 end
+                X = h[CombatController.CurrentIndex]
+                local h = os.time()
+                TweenController.Create(X + Vector3.new(0, 35, 35))
+                if CaculateDistance(X + Vector3.new(0, 35, 35)) < 15 then CombatController.CurrentIndex = CombatController.CurrentIndex + 1 end
+            end
+        end
+    end
+    LevelFarmTTL = 0
+    LastTravel = os.time()
+    FunctionsHandler = {Initalized = false}
+    print(3000)
+    setmetatable(FunctionsHandler, {__index = function(h, X)
+        QueryResult = rawget(h, X)
+        if not QueryResult then
+            return {
+                Register = function(w)
+                    if w == false then return end
+                    Result = {CacheListener = {}, RealCache = {}, Methods = {}, Constants = {}, Events = {}, Initalized = true}
+                    function Result.RegisterMethod(w, D, y)
+                        w.Methods[D] = {Name = D, Callback = y, Call = function(w, ...) return w.Callback(...) end, Events = {}}
+                        return true
+                    end
+                    setmetatable(Result.Constants, {__newindex = function() assert(false, 'cannot change constant value!') end})
+                    if h.Constants[Key] then
+                        function Result.SaveConstant(w, w, w) return assert(false, 'constant name was used before!') end
+                        rawset(h.Constants, Key, Value)
+                    end
+                    function Result.Set(h, w, D)
+                        h.CacheListener[w] = D
+                        return D
+                    end
+                    function Result.Get(h, w) return h.Constants[w] or h.RealCache[w] end
+                    function Result.AddVariableChangeListener(h, w, D) h.Events[w] = D end
+                    Result.CacheListener.__parent = Result
+                    setmetatable(Result.CacheListener, {__newindex = function(h, w, D)
+                        _ = h.__parent.Events[w] and h.__parent.Events[w](w, D)
+                        h.__parent.RealCache[w] = D
+                    end})
+                    FunctionsHandler[X] = Result
+                end, Initalized = false
+            }
+        end
+        return QueryResult
+    end})
+    function FunctionsHandler.SynchorizeUntilModuleLoaded(h, X)
+        local w = os.time()
+        while not h.Initalized do
+            task.wait()
+            local h = os.time() - w
+            assert(not (X and h > X), "timed out")
+        end
+    end
+    function GetCurrentClaimQuest(h)
+        local h = game.Players.LocalPlayer.PlayerGui.Main.Quest.Visible and game.Players.LocalPlayer.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text:gsub("%s*Defeat%s*(%d*)%s*(.-)%s*%b()", "%2")
+        return (type(h) == "string" and string.gsub(h, "Military ", "Mil. ") or h), game.Players.LocalPlayer.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text
+    end
+    FunctionsHandler.LocalPlayerController.Register()
+    FunctionsHandler.ExpRedeem:Register()
+    FunctionsHandler.LevelFarm:Register()
+    FunctionsHandler.Saber:Register()
+    FunctionsHandler.Rengoku:Register()
+    FunctionsHandler.Yama:Register()
+    FunctionsHandler.Tushita:Register()
+    FunctionsHandler.SpikeyTrident:Register()
+    FunctionsHandler.SharkAchor:Register()
+    FunctionsHandler.Pole:Register()
+    FunctionsHandler.FoxLamp:Register()
+    FunctionsHandler.DarkDagger:Register()
+    FunctionsHandler.Canvander:Register()
+    FunctionsHandler.BuddySword:Register()
+    FunctionsHandler.HallowScythe:Register()
+    FunctionsHandler.CursedDualKatana:Register()
+    FunctionsHandler.AcidumRifle:Register()
+    FunctionsHandler.Kabucha:Register()
+    FunctionsHandler.VenomBow:Register()
+    FunctionsHandler.SoulGuitar:Register()
+    FunctionsHandler.DragonStorm:Register()
+    FunctionsHandler.InsictV2:Register()
+    FunctionsHandler.RainbowSaviour:Register()
+    FunctionsHandler.DarkBladeV2:Register()
+    FunctionsHandler.SecondSeaPuzzle:Register()
+    FunctionsHandler.ColosseumPuzzle:Register()
+    FunctionsHandler.Trevor:Register()
+    FunctionsHandler.EvoRace:Register()
+    FunctionsHandler.Wenlocktoad:Register()
+    FunctionsHandler.DarkBladeV3:Register()
+    FunctionsHandler.ThirdSeaPuzzle:Register()
+    FunctionsHandler.DojoQuest:Register()
+    FunctionsHandler.RaceAwakening:Register()
+    FunctionsHandler.PirateRaid:Register()
+    FunctionsHandler.SwordBossTask:Register()
+    FunctionsHandler.CakePrinceTask:Register()
+    FunctionsHandler.RaidController:Register()
+    FunctionsHandler.AutoRaidIce:Register()
+    FunctionsHandler.MeleesController:Register()
+    FunctionsHandler.Superhuman:Register()
+    FunctionsHandler.DeathStep:Register()
+    FunctionsHandler.SharkmanKarate:Register()
+    FunctionsHandler.ElectricClaw:Register()
+    FunctionsHandler.DragonTalon:Register()
+    FunctionsHandler.Godhuman:Register()
+    FunctionsHandler.BossesTask:Register()
+    FunctionsHandler.SpecialBossesTask:Register()
+    FunctionsHandler.CollectDrops:Register()
+    FunctionsHandler.CollectBerries:Register()
+    FunctionsHandler.UtillyItemsActivitation:Register()
+
+    -- ============================================================
+    -- AUTO FULL MELEE - TƯƠNG THÍCH VỚI LEVEL FARM
+    -- ============================================================
+    -- [NEW] V1 → V2 pairing — dùng để biết trái nào đang farm mastery là
+    -- V1 của võ nào, và tên teacher/style tương ứng theo MeleePrices
+    local V1ToV2 = {
+        ["Black Leg"]      = "Death Step",       -- "Dark Step" (tên Teacher)
+        ["Electro"]        = "Electric Claw",
+        ["Fishman Karate"] = "Sharkman Karate",   -- "Water Kung Fu"
+        ["Dragon Claw"]    = "Dragon Talon",
+    }
+
+    FunctionsHandler.MeleesController:RegisterMethod("Refresh", function()
+        if not Config.Items.AutoFullyMelees or not Config.Melee.AutoBuy then return nil end
+        if ScriptStorage.PlayerData.Level < 200 then return nil end
+        -- [FIXED] Bỏ "if _G.Level then return nil end" — đây là khóa VĨNH VIỄN,
+        -- một khi thiếu tiền 1 lần là MeleesController tắt luôn mãi mãi vì
+        -- không có chỗ nào khác set lại _G.Level = false. Bỏ hẳn cờ này,
+        -- để Refresh tự nhiên re-check mỗi vòng — rẻ, an toàn, tự phục hồi.
+
+        local allMelees = {"Black Leg", "Electro", "Fishman Karate", "Dragon Claw", "Superhuman", "Death Step", "Sharkman Karate", "Electric Claw", "Dragon Talon", "Godhuman"}
+        local hasAll = true
+        for _, name in ipairs(allMelees) do
+            if not CheckItem(name) then
+                hasAll = false
+                break
+            end
+        end
+        if hasAll then
+            SetTask('MainTask', 'Auto Full Melee | ✅ Đã có tất cả!')
+            return nil
+        end
+        return true
+    end)
+
+    FunctionsHandler.MeleesController:RegisterMethod("Start", function()
+        if not Config.Items.AutoFullyMelees or not Config.Melee.AutoBuy then return end
+        if ScriptStorage.PlayerData.Level < 200 then return end
+
+        local meleeList = {
+            -- [FIXED - LỖI NỀN TẢNG] Trước đây key = "BuyBlackLeg" v.v. —
+            -- nhưng BuyMelee() TỰ thêm "Buy" ở trong ('Buy' .. W), nên gọi
+            -- ra remote "BuyBuyBlackLeg" — KHÔNG TỒN TẠI, mua không bao giờ
+            -- thành công. Đồng thời special-case DragonClaw/Godhuman trong
+            -- BuyMelee so sánh W=="DragonClaw"/"Godhuman" (không "Buy...")
+            -- nên trước đây KHÔNG BAO GIỜ khớp, luôn rơi vào nhánh generic
+            -- sai. Bỏ hẳn tiền tố "Buy" khỏi key — để BuyMelee tự thêm.
+            {name = "Black Leg", key = "BlackLeg", price = {Beli = 150000}, levelReq = 300},
+            {name = "Electro", key = "Electro", price = {Beli = 500000}, levelReq = 300},
+            {name = "Fishman Karate", key = "FishmanKarate", price = {Beli = 750000}, levelReq = 300},
+            {name = "Dragon Claw", key = "DragonClaw", price = {Fragments = 1500}, levelReq = 300},
+            {name = "Superhuman", key = "Superhuman", price = {Beli = 3000000}, levelReq = nil, needMastery = {item = "Dragon Claw", value = 300}},
+            {name = "Death Step", key = "DeathStep", price = {Beli = 2500000, Fragments = 5000}, levelReq = 400, needKey = "Library Key"},
+            {name = "Sharkman Karate", key = "SharkmanKarate", price = {Beli = 2500000, Fragments = 5000}, levelReq = 400, needKey = "Water Key"},
+            {name = "Electric Claw", key = "ElectricClaw", price = {Beli = 2500000, Fragments = 5000}, levelReq = 400},
+            {name = "Dragon Talon", key = "DragonTalon", price = {Beli = 2500000, Fragments = 5000}, levelReq = 400, needFireEssence = true},
+            {name = "Godhuman", key = "Godhuman", price = {Beli = 5000000, Fragments = 5000}, levelReq = 400, needMaterials = true},
+        }
+
+        -- [NEW] Cổng kiểm tra "mọi thứ đủ điều kiện chưa" — boss man yêu
+        -- cầu: chỉ khi TẤT CẢ 9 melee (V1+V2, gồm cả Superhuman — spec mới
+        -- yêu cầu Superhuman cũng phải đạt 500 trước Godhuman, KHÁC với
+        -- thiết kế cũ của tao lúc trước loại trừ nó, đã sửa lại) đã MUA
+        -- XONG và ĐẠT mastery mục tiêu (V1=500, V2=400) thì mới bắt đầu
+        -- farm vật liệu/F/Beli cho Godhuman.
+        local MASTERY_GATE_MELEES = {
+            {name = "Black Leg",       target = Config.Melee.RaidAtV1Mastery},
+            {name = "Electro",         target = Config.Melee.RaidAtV1Mastery},
+            {name = "Fishman Karate",  target = Config.Melee.RaidAtV1Mastery},
+            {name = "Dragon Claw",     target = Config.Melee.RaidAtV1Mastery},
+            {name = "Superhuman",      target = Config.Melee.RaidAtV1Mastery},
+            {name = "Death Step",      target = Config.Melee.GodhumanAtV2Mastery},
+            {name = "Sharkman Karate", target = Config.Melee.GodhumanAtV2Mastery},
+            {name = "Electric Claw",   target = Config.Melee.GodhumanAtV2Mastery},
+            {name = "Dragon Talon",    target = Config.Melee.GodhumanAtV2Mastery},
+        }
+
+        local function AllMeleesReady()
+            for _, m in ipairs(MASTERY_GATE_MELEES) do
+                if not CheckItem(m.name) then return false, m.name .. " (chưa mua)" end
+                local mst = ScriptStorage.Melees[m.name] or 0
+                if mst < m.target then return false, m.name .. " (" .. mst .. "/" .. m.target .. ")" end
+            end
+            return true
+        end
+
+
+        -- Sea nào không có tên trong bảng = thầy đó không đứng ở Sea đó,
+        -- phải qua Sea khác (Sea 3 có đủ cả 8 thầy nên dùng làm fallback)
+        local TeacherLocations = {
+            ["Water Kung-fu Teacher"] = {
+                [1] = CFrame.new(61586.96, 19.58, 987.59),
+                [2] = CFrame.new(-4957.68, 35.94, -4665.6),
+                [3] = CFrame.new(-5023.91, 371.02, -3191.46),
+            },
+            ["Mad Scientist"] = {
+                [1] = CFrame.new(-5382.79, 12.55, -2148.82),
+                [2] = CFrame.new(-4866.16, 33.92, -4767.11),
+                [3] = CFrame.new(-4996.06, 313.21, -3201.83),
+            },
+            ["Dark Step Teacher"] = {
+                [1] = CFrame.new(-983.62, 12.44, 3990.46),
+                [2] = CFrame.new(-4752.44, 33.92, -4848.04),
+                [3] = CFrame.new(-5045.61, 370.01, -3182.31),
+            },
+            ["Phoeyu, the Reformed"] = {
+                [2] = CFrame.new(6356.47, 296.1, -6762.78),
+                [3] = CFrame.new(-4999.24, 314.01, -3221.58),
+            },
+            ["Sharkman Teacher"] = {
+                [2] = CFrame.new(-2599.63, 238.19, -10316),
+                [3] = CFrame.new(-4971.21, 313.88, -3223.08),
+            },
+            ["Previous Hero"] = {
+                [3] = CFrame.new(-10371.48, 330.76, -10131.42),
+            },
+            ["Uzoth"] = {
+                [3] = CFrame.new(5661.89, 1210.87, 863.17),
+            },
+            ["Ancient Monk"] = {
+                [3] = CFrame.new(-13774.1, 333.73, -9879.91),
+            },
+        }
+        -- [NEW] Melee nào → thầy nào (khớp với tên trong MeleePrices.Buy)
+        -- Dragon Claw ("Sabi") và Superhuman ("Martial Arts Master") KHÔNG
+        -- có trong data boss man cho — để trống, không bịa toạ độ
+        local MeleeTeacher = {
+            ["Fishman Karate"]   = "Water Kung-fu Teacher",
+            ["Electro"]          = "Mad Scientist",
+            ["Black Leg"]        = "Dark Step Teacher",
+            ["Death Step"]       = "Phoeyu, the Reformed",
+            ["Sharkman Karate"]  = "Sharkman Teacher",
+            ["Electric Claw"]    = "Previous Hero",
+            ["Dragon Talon"]     = "Uzoth",
+            ["Godhuman"]         = "Ancient Monk",
+        }
+
+        -- [NEW] Tween tới đúng thầy trước khi mua — đây là phần BỊ THIẾU
+        -- khiến "mua bị lỗi" (gọi remote mua nhưng nhân vật không đứng gần
+        -- NPC nên server từ chối). Sea hiện tại có thầy → dùng luôn; không
+        -- có → qua Sea 3 (thầy nào cũng có mặt ở đó).
+        local function GoToTeacher(meleeName)
+            local teacher = MeleeTeacher[meleeName]
+            if not teacher then return true end -- không có data vị trí, bỏ qua bước này
+            local locs = TeacherLocations[teacher]
+            if not locs then return true end
+
+            local cf = locs[SeaIndex]
+            if not cf then
+                if SeaIndex ~= 3 then
+                    Remotes.CommF_:InvokeServer("TravelZou")
+                    return false
+                end
+                return true -- đang ở Sea 3 mà bảng thiếu toạ độ Sea 3 (không nên xảy ra)
+            end
+
+            if CaculateDistance(cf) > 10 then
+                TweenController.Create(cf)
+                return false
+            end
+            return true
+        end
+
+        for _, melee in ipairs(meleeList) do
+            if _G.Stop then return end
+
+            local bp = CheckItem(melee.name)
+            if not bp then
+                -- [NEW] Dragon Claw V1 cần riêng 1500 Fragments — nếu chưa
+                -- đủ thì đây chính là lý do phải farm raid (raid cho
+                -- Fragments), không phải lỗi gì khác
+                if melee.name == "Dragon Claw" and (ScriptStorage.PlayerData.Fragments or 0) < 1500 then
+                    SetTask('MainTask', 'Auto Full Melee | Dragon Claw cần 1500 Fragments — đang farm Raid (' .. (ScriptStorage.PlayerData.Fragments or 0) .. '/1500)')
+                    return
+                end
+
+                local canBuy = true
+                for currency, amount in pairs(melee.price) do
+                    local have = (currency == "Beli" and ScriptStorage.PlayerData.Beli) or
+                                 (currency == "Fragments" and ScriptStorage.PlayerData.Fragments) or 0
+                    if have < amount then canBuy = false end
+                end
+                -- [FIXED] needKey/needFireEssence/needMaterials trước đây
+                -- nằm ở nhánh "ĐÃ SỞ HỮU" (else bên dưới) — vô nghĩa, vì đây
+                -- là điều kiện TIÊN QUYẾT phải có TRƯỚC khi mua, không phải
+                -- thứ cần check sau khi đã mua xong. Chuyển về đúng chỗ.
+
+                if melee.needKey and not CheckItem(melee.needKey) then
+                    SetTask('MainTask', 'Auto Full Melee | Lấy ' .. melee.needKey .. ' cho ' .. melee.name)
+                    if melee.needKey == "Library Key" then
+                        local admiral = GetConnectionEnemies("Awakened Ice Admiral")
+                        if admiral then
+                            -- [FIXED - giảm delay] Attack() đã tự block chờ
+                            -- hạ xong rồi, wait(2) sau đó là dư thừa
+                            CombatController.Attack("Awakened Ice Admiral")
+                        else
+                            TweenController.Create(CFrame.new(5668.978, 28.52, -6483.352))
+                        end
+                    elseif melee.needKey == "Water Key" then
+                        local tide = GetConnectionEnemies("Tide Keeper")
+                        if tide then
+                            CombatController.Attack("Tide Keeper")
+                        else
+                            TweenController.Create(CFrame.new(-3053.981, 237.19, -10145.039))
+                        end
+                    end
+                    return
+                end
+
+                -- [NEW] Điều kiện tiên quyết mastery — verified từ raw_6:
+                -- Superhuman cần Dragon Claw đạt 300 mastery trước khi mua
+                if melee.needMastery then
+                    local preMastery = ScriptStorage.Melees[melee.needMastery.item] or 0
+                    if not CheckItem(melee.needMastery.item) or preMastery < melee.needMastery.value then
+                        SetTask('MainTask', 'Auto Full Melee | Cần ' .. melee.needMastery.item .. ' đạt ' .. melee.needMastery.value .. ' mastery trước (hiện ' .. preMastery .. ') để mua ' .. melee.name)
+                        return
+                    end
+                end
+
+                if melee.needFireEssence then
+                    local hasFireEssence = CheckItem("Fire Essence")
+
+                    if hasFireEssence then
+                        -- [FIXED] Verified từ raw_6: equip Fire Essence rồi gọi
+                        -- BuyDragonTalon HAI LẦN (true, rồi không tham số) —
+                        -- trước đây tao chỉ farm bones, chưa từng thật sự dùng
+                        -- Fire Essence để mua Dragon Talon.
+                        SetTask('MainTask', 'Auto Full Melee | Dùng Fire Essence mua Dragon Talon')
+                        FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call("Fire Essence")
+                        task.wait(0.5)
+                        Remotes.CommF_:InvokeServer("BuyDragonTalon", true)
+                        Remotes.CommF_:InvokeServer("BuyDragonTalon")
+                        return
+                    end
+
+                    if not CheckItem(melee.name) then
+                        -- [FIXED] Ngưỡng thật 500 Bones (giống CDK), burst-buy
+                        -- tới khi hết, không nhỏ giọt buy(1,1) từng lần
+                        local bonesCount = Remotes.CommF_:InvokeServer("Bones", "Check")
+                        if bonesCount and bonesCount > 500 then
+                            SetTask('MainTask', 'Auto Full Melee | Đổi Bones lấy Fire Essence (' .. bonesCount .. ')')
+                            repeat
+                                Remotes.CommF_:InvokeServer("Bones", "Buy", 1, 1)
+                                task.wait(0.2)
+                                bonesCount = Remotes.CommF_:InvokeServer("Bones", "Check")
+                            until not bonesCount or bonesCount <= 0
+                            return
+                        end
+                        if not ScriptStorage.Enemies["Reborn Skeleton"] and not ScriptStorage.Enemies["Living Zombie"]
+                            and not ScriptStorage.Enemies["Demonic Soul"] and not ScriptStorage.Enemies["Posessed Mummy"] then
+                            -- [NEW] Chưa thấy quái gần đây → di chuyển tới đúng
+                            -- điểm farm Haunted Castle thay vì đứng im chờ
+                            SetTask('MainTask', 'Auto Full Melee | Di chuyển tới Haunted Castle farm Bones (' .. (bonesCount or 0) .. '/500)')
+                            TweenController.Create(HAUNTED_CASTLE_BONES_CF)
+                            return
+                        end
+                        SetTask('MainTask', 'Auto Full Melee | Farm Bones cho Fire Essence (' .. (bonesCount or 0) .. '/500)')
+                        CombatController.Attack({'Reborn Skeleton', 'Living Zombie', 'Demonic Soul', 'Posessed Mummy'})
+                        return
+                    end
+                end
+
+                if melee.needMaterials then
+                    -- [NEW] Cổng "mọi thứ đủ điều kiện chưa" — CHỈ farm vật
+                    -- liệu Godhuman khi cả 8 melee kia đã mua + đủ mastery
+                    local ready, reason = AllMeleesReady()
+                    if not ready then
+                        SetTask('MainTask', 'Auto Full Melee | Godhuman: chưa đủ điều kiện — ' .. (reason or "?"))
+                        return
+                    end
+
+                    local materials = {
+                        {name = "Dragon Scale", need = 10, sea = 3, mobs = {"Dragon Crew Warrior", "Dragon Crew Archer"}},
+                        {name = "Fish Tail", need = 20, sea = 3, mobs = {"Fishman Raider", "Fishman Captain"}},
+                        {name = "Mystic Droplet", need = 10, sea = 2, mobs = {"Sea Soldier", "Water Fighter"}},
+                        {name = "Magma Ore", need = 20, sea = 2, mobs = {"Magma Ninja"}},
+                    }
+                    for _, mat in ipairs(materials) do
+                        local count = ScriptStorage.Backpack[mat.name] and ScriptStorage.Backpack[mat.name].Count or 0
+                        if count < mat.need then
+                            if SeaIndex ~= mat.sea then
+                                Remotes.CommF_:InvokeServer(mat.sea == 2 and "TravelDressrosa" or "TravelZou")
+                                return
+                            end
+                            SetTask('MainTask', 'Auto Full Melee | Godhuman: farm ' .. mat.name .. ' (' .. count .. '/' .. mat.need .. ')')
+                            CombatController.Attack(mat.mobs)
+                            return
+                        end
+                    end
+                    -- Đủ vật liệu rồi → rơi xuống check tiền/Fragments bên dưới để mua
+                end
+
+                if canBuy then
+                    -- [FIXED - LỖI SÂU] GoToTeacher() của tao tự tween thủ
+                    -- công là ĐÚNG (dùng toạ độ verified, phủ đủ cả
+                    -- DragonClaw/Superhuman mà bảng gốc BindedMeleeNPCNames
+                    -- KHÔNG có) — giữ nguyên bước này.
+                    -- NHƯNG cách gọi remote SAI: trước giờ chỉ gọi
+                    -- BuyMelee(key, true) — đây là proxy CHECK (2nd arg=true
+                    -- khiến auto-navigate của proxy gốc dòng ~427 bị skip vì
+                    -- nó yêu cầu "not h"), KHÔNG PHẢI lệnh mua thật. Phải gọi
+                    -- THÊM lần 2 KHÔNG kèm true để proxy thật sự chạy nhánh
+                    -- mua (dòng 446 luôn invoke thật, nhưng cần đủ 2 bước để
+                    -- J ghi nhận hợp lệ trước khi bước 2 chạy).
+                    if not GoToTeacher(melee.name) then
+                        SetTask('MainTask', 'Auto Full Melee | Di chuyển tới ' .. (MeleeTeacher[melee.name] or "?") .. ' để mua ' .. melee.name)
+                        return
+                    end
+                    SetTask('MainTask', 'Auto Full Melee | Mua ' .. melee.name)
+                    local checkResult = BuyMelee(melee.key, true)  -- Bước 1: check (proxy ghi vào J nếu hợp lệ)
+                    task.wait(0.3)
+                    BuyMelee(melee.key)                            -- Bước 2: mua thật (kích hoạt proxy auto-navigate + invoke thật)
+                    task.wait(0.5)
+                    if CheckItem(melee.name) then
+                        SetTask('MainTask', 'Auto Full Melee | ✅ Mua thành công ' .. melee.name)
+                    else
+                        SetTask('SubTask', 'Auto Full Melee | Đã gửi lệnh mua ' .. melee.name .. ' — kiểm tra lại vòng sau')
+                    end
+                else
+                    -- [FIXED] Không còn set _G.Level=true (khóa vĩnh viễn) —
+                    -- chỉ báo trạng thái rồi return, Refresh sẽ tự thử lại
+                    -- vòng sau khi tiền/Fragments đủ (RaidController vẫn
+                    -- chạy song song farm Fragments qua TasksOrder bình thường)
+                    -- Đúng yêu cầu boss man: "chạy lại mua tới chừng nào mua được"
+                    SetTask('MainTask', 'Auto Full Melee | Cần farm tiền cho ' .. melee.name)
+                    return
+                end
+            else
+                -- [FIXED] Mastery đọc từ ScriptStorage.Melees[name] — đây mới
+                -- là nguồn thật (xem dòng ~403). "bp.Level.Value" cũ KHÔNG
+                -- TỒN TẠI trên tool, khiến toàn bộ check mastery bị bỏ qua
+                -- lặng lẽ (bp:FindFirstChild("Level") luôn nil → điều kiện
+                -- luôn false) — đây là lý do auto melee tưởng đã "sẵn sàng"
+                -- dù mastery còn thấp.
+                local mastery = ScriptStorage.Melees[melee.name] or 0
+
+                if melee.levelReq and ScriptStorage.PlayerData.Level < melee.levelReq then
+                    SetTask('MainTask', 'Auto Full Melee | Cần Player Level ' .. melee.levelReq .. ' cho ' .. melee.name)
+                    return
+                end
+
+                -- [NEW] V1 đạt 500 mastery + chưa có V2 tương ứng → ưu tiên
+                -- Raid lấy Fragments (yêu cầu boss man: "nếu đc 500 mastery
+                -- thì đi raid để có F mua võ v2"). Đạt rồi thì KHÔNG return
+                -- cứng — để vòng lặp tiếp tục xử lý các melee còn lại ("kiểm
+                -- tra nếu đủ điều kiện mastery thì mua melee khác").
+                local v2Name = V1ToV2[melee.name]
+                if Config.Melee.CheckMasteryAfterBuy and v2Name and not CheckItem(v2Name) then
+                    if mastery < Config.Melee.RaidAtV1Mastery then
+                        SetTask('SubTask', melee.name .. ' đang train mastery (' .. mastery .. '/' .. Config.Melee.RaidAtV1Mastery .. ')')
+                    else
+                        local v2Data = MeleePrices[v2Name]
+                        local needFrags = (v2Data and v2Data.Price and v2Data.Price.Fragments) or 5000
+                        local needBeli  = (v2Data and v2Data.Price and v2Data.Price.Beli) or 2500000
+                        local haveFrags = ScriptStorage.PlayerData.Fragments or 0
+                        local haveBeli  = ScriptStorage.PlayerData.Beli or 0
+                        if haveFrags < needFrags or haveBeli < needBeli then
+                            SetTask('MainTask', string.format(
+                                'Auto Full Melee | %s đạt %d mastery — chờ Raid farm Fragments cho %s (F:%d/%d, Beli:%d/%d)',
+                                melee.name, mastery, v2Name, haveFrags, needFrags, haveBeli, needBeli
+                            ))
+                        end
+                    end
+                end
+
+                -- [NEW] V2 đạt 400 mastery → điều kiện Godhuman coi như đạt
+                -- cho MELEE NÀY (còn đủ điều kiện TỔNG THỂ hay chưa thì
+                -- AllMeleesReady() ở nhánh needMaterials phía trên quyết định)
+                local V2_TO_GODHUMAN = {["Death Step"]=true, ["Sharkman Karate"]=true, ["Electric Claw"]=true, ["Dragon Talon"]=true}
+                if Config.Melee.CheckMasteryAfterBuy and V2_TO_GODHUMAN[melee.name] and not CheckItem("Godhuman") then
+                    if mastery < Config.Melee.GodhumanAtV2Mastery then
+                        SetTask('SubTask', melee.name .. ' đang train mastery (' .. mastery .. '/' .. Config.Melee.GodhumanAtV2Mastery .. ')')
+                    end
+                end
+
+                SetTask('SubTask', '✅ ' .. melee.name .. ' đã sẵn sàng')
+            end
+        end
+
+        SetTask('MainTask', 'Auto Full Melee | 🎉 Hoàn thành tất cả!')
+    end)
+
+    -- ============================================================
+    -- LEVEL FARM - HOÀN CHỈNH
+    -- ============================================================
+    -- [ADDED - theo yêu cầu boss man: "sửa hệ thống farm lv... từ file
+    -- message 10"] QuestController — theo dõi quest bằng REMOTE EVENT thật
+    -- (Remotes.QuestUpdate) thay vì GetCurrentClaimQuest() (đọc GUI text
+    -- PlayerGui.Main.Quest.Container.QuestTitle.Title.Text). Đọc GUI text
+    -- có độ trễ replication thật — bắn StartQuest xong, đọc lại GUI ngay
+    -- frame kế có thể vẫn thấy tên quest CŨ, khiến so sánh "CurrentClaim
+    -- Quest1 ~= Q.NameMon" sai và gọi AbandonQuest ngay quest vừa nhận.
+    -- Remotes.QuestUpdate:OnClientEvent bắn THẲNG từ server mỗi khi quest
+    -- state đổi — không polling, không trễ.
+    QuestController = {
+        CurrentQuest = "",
+        CurrentQuestName = "",
+        QuestConnection = nil,
+    }
+    QuestController.Set = function(self, data)
+        self.CurrentQuest = (function()
+            for i, _ in next, data.Progress do
+                return i
+            end
+        end)()
+        self.CurrentQuestName = data.InternalQuestName
+    end
+    QuestController.Reset = function(self)
+        self.CurrentQuest = ""
+        self.CurrentQuestName = ""
+    end
+    local questConnectOk = pcall(function()
+        QuestController.QuestConnection = Services.ReplicatedStorage.Remotes.QuestUpdate.OnClientEvent:Connect(function(a2, a3)
+            if a2 and typeof(a2) == "table" then
+                QuestController:Set(a2)
+                return
+            end
+            QuestController:Reset()
+        end)
+    end)
+    -- [FIXED] QuestController.CurrentQuestName là tên QUEST (vd
+    -- "BanditQuest1"), KHÁC với GetCurrentClaimQuest() (tên MOB đọc từ GUI
+    -- text) — 2 thứ không so sánh chéo được. HasActiveQuest()/GetActive
+    -- QuestName() tách riêng, và nếu không kết nối được Remotes.QuestUpdate
+    -- thì trả về nil để Start() tự rơi về GetCurrentClaimQuest() (so mob
+    -- name như cũ) — không trộn lẫn 2 loại tên.
+    function HasActiveQuestEvent()
+        return questConnectOk and QuestController.QuestConnection ~= nil
+    end
+    function GetActiveQuestName()
+        if not HasActiveQuestEvent() then return nil end
+        if QuestController.CurrentQuest == "" then return false end
+        return QuestController.CurrentQuestName
+    end
+
+    local function ManualLevelLookup()
+        -- [ADDED - theo yêu cầu boss man] Bảng farm-lv THỦ CÔNG, KHÔNG phụ
+        -- thuộc J.RefreshQuest/require(Quests) (chuỗi đang gãy — J.RefreshQuest
+        -- match ScriptStorage.PlayerData.Level với LevelReq trong Quests module,
+        -- lỡ không khớp thì "h" ở đó ra nil rồi crash ngay dòng kế — đúng kiểu
+        -- "request data lv" mà farm theo không chạy nữa). Bảng này CHỈ đọc
+        -- ScriptStorage.PlayerData.Level (property thường, không qua request/
+        -- module-matching gì cả) rồi tra thẳng mob+CFrame, y hệt cách vantablack/
+        -- Maru Premium làm — dữ liệu lấy nguyên từ file tham chiếu thật đã verify
+        -- (toạ độ CFrame chính xác từng đảo, không đoán).
+        local MyLevel = ScriptStorage.PlayerData.Level or 0
+        local Mon, Qdata, Qname, NameMon = "", 0, "", ""
+        local PosQ, PosM = nil, nil
+
+        if SeaIndex == 1 then
+            if MyLevel >= 1 and MyLevel <= 9 then
+                Mon = "Bandit"; Qdata = 1; Qname = "BanditQuest1"; NameMon = "Bandit"
+                PosQ = CFrame.new(1059.37195, 15.4495068, 1550.4231, 0.939700544, 0, -0.341998369, 0, 1, 0, 0.341998369, 0, 0.939700544)
+                PosM = CFrame.new(1045.962646484375, 27.00250816345215, 1560.8203125)
+            elseif MyLevel >= 10 and MyLevel <= 14 then
+                Mon = "Monkey"; Qdata = 1; Qname = "JungleQuest"; NameMon = "Monkey"
+                PosQ = CFrame.new(-1598.08911, 35.5501175, 153.377838, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+                PosM = CFrame.new(-1448.51806640625, 67.85301208496094, 11.46579647064209)
+            elseif MyLevel >= 15 and MyLevel <= 29 then
+                Mon = "Gorilla"; Qdata = 2; Qname = "JungleQuest"; NameMon = "Gorilla"
+                PosQ = CFrame.new(-1598.08911, 35.5501175, 153.377838, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+                PosM = CFrame.new(-1129.8836669921875, 40.46354675296875, -525.4237060546875)
+            elseif MyLevel >= 30 and MyLevel <= 39 then
+                Mon = "Pirate"; Qdata = 1; Qname = "BuggyQuest1"; NameMon = "Pirate"
+                PosQ = CFrame.new(-1141.07483, 4.10001802, 3831.5498, 0.965929627, 0, -0.258804798, 0, 1, 0, 0.258804798, 0, 0.965929627)
+                PosM = CFrame.new(-1103.513427734375, 13.752052307128906, 3896.091064453125)
+            elseif MyLevel >= 40 and MyLevel <= 59 then
+                Mon = "Brute"; Qdata = 2; Qname = "BuggyQuest1"; NameMon = "Brute"
+                PosQ = CFrame.new(-1141.07483, 4.10001802, 3831.5498, 0.965929627, 0, -0.258804798, 0, 1, 0, 0.258804798, 0, 0.965929627)
+                PosM = CFrame.new(-1140.083740234375, 14.809885025024414, 4322.92138671875)
+            elseif MyLevel >= 60 and MyLevel <= 74 then
+                Mon = "Desert Bandit"; Qdata = 1; Qname = "DesertQuest"; NameMon = "Desert Bandit"
+                PosQ = CFrame.new(894.488647, 5.14000702, 4392.43359, 0.819155693, 0, -0.573571265, 0, 1, 0, 0.573571265, 0, 0.819155693)
+                PosM = CFrame.new(924.7998046875, 6.44867467880249, 4481.5859375)
+            elseif MyLevel >= 75 and MyLevel <= 89 then
+                Mon = "Desert Officer"; Qdata = 2; Qname = "DesertQuest"; NameMon = "Desert Officer"
+                PosQ = CFrame.new(894.488647, 5.14000702, 4392.43359, 0.819155693, 0, -0.573571265, 0, 1, 0, 0.573571265, 0, 0.819155693)
+                PosM = CFrame.new(1608.2822265625, 8.614224433898926, 4371.00732421875)
+            elseif MyLevel >= 90 and MyLevel <= 99 then
+                Mon = "Snow Bandit"; Qdata = 1; Qname = "SnowQuest"; NameMon = "Snow Bandit"
+                PosQ = CFrame.new(1389.74451, 88.1519318, -1298.90796, -0.342042685, 0, 0.939684391, 0, 1, 0, -0.939684391, 0, -0.342042685)
+                PosM = CFrame.new(1354.347900390625, 87.27277374267578, -1393.946533203125)
+            elseif MyLevel >= 100 and MyLevel <= 119 then
+                Mon = "Snowman"; Qdata = 2; Qname = "SnowQuest"; NameMon = "Snowman"
+                PosQ = CFrame.new(1389.74451, 88.1519318, -1298.90796, -0.342042685, 0, 0.939684391, 0, 1, 0, -0.939684391, 0, -0.342042685)
+                PosM = CFrame.new(1201.6412353515625, 144.57958984375, -1550.0670166015625)
+            elseif MyLevel >= 120 and MyLevel <= 149 then
+                Mon = "Chief Petty Officer"; Qdata = 1; Qname = "MarineQuest2"; NameMon = "Chief Petty Officer"
+                PosQ = CFrame.new(-5039.58643, 27.3500385, 4324.68018, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-4881.23095703125, 22.65204429626465, 4273.75244140625)
+            elseif MyLevel >= 150 and MyLevel <= 174 then
+                Mon = "Sky Bandit"; Qdata = 1; Qname = "SkyQuest"; NameMon = "Sky Bandit"
+                PosQ = CFrame.new(-4839.53027, 716.368591, -2619.44165, 0.866007268, 0, 0.500031412, 0, 1, 0, -0.500031412, 0, 0.866007268)
+                PosM = CFrame.new(-4953.20703125, 295.74420166015625, -2899.22900390625)
+            elseif MyLevel >= 175 and MyLevel <= 189 then
+                Mon = "Dark Master"; Qdata = 2; Qname = "SkyQuest"; NameMon = "Dark Master"
+                PosQ = CFrame.new(-4839.53027, 716.368591, -2619.44165, 0.866007268, 0, 0.500031412, 0, 1, 0, -0.500031412, 0, 0.866007268)
+                PosM = CFrame.new(-5259.8447265625, 391.3976745605469, -2229.035400390625)
+            elseif MyLevel >= 190 and MyLevel <= 209 then
+                Mon = "Prisoner"; Qdata = 1; Qname = "PrisonerQuest"; NameMon = "Prisoner"
+                PosQ = CFrame.new(5308.93115, 1.65517521, 475.120514, -0.0894274712, 0, -0.995993316, 0, 1, 0, 0.995993316, 0, -0.0894274712)
+                PosM = CFrame.new(5098.9736328125, -0.3204058110713959, 474.2373352050781)
+            elseif MyLevel >= 210 and MyLevel <= 249 then
+                Mon = "Dangerous Prisoner"; Qdata = 2; Qname = "PrisonerQuest"; NameMon = "Dangerous Prisoner"
+                PosQ = CFrame.new(5308.93115, 1.65517521, 475.120514, -0.0894274712, 0, -0.995993316, 0, 1, 0, 0.995993316, 0, -0.0894274712)
+                PosM = CFrame.new(5654.5634765625, 15.633401870727539, 866.2991943359375)
+            elseif MyLevel >= 250 and MyLevel <= 274 then
+                Mon = "Toga Warrior"; Qdata = 1; Qname = "ColosseumQuest"; NameMon = "Toga Warrior"
+                PosQ = CFrame.new(-1580.04663, 6.35000277, -2986.47534, -0.515037298, 0, -0.857167721, 0, 1, 0, 0.857167721, 0, -0.515037298)
+                PosM = CFrame.new(-1820.21484375, 51.68385696411133, -2740.6650390625)
+            elseif MyLevel >= 275 and MyLevel <= 299 then
+                Mon = "Gladiator"; Qdata = 2; Qname = "ColosseumQuest"; NameMon = "Gladiator"
+                PosQ = CFrame.new(-1580.04663, 6.35000277, -2986.47534, -0.515037298, 0, -0.857167721, 0, 1, 0, 0.857167721, 0, -0.515037298)
+                PosM = CFrame.new(-1292.838134765625, 56.380882263183594, -3339.031494140625)
+            elseif MyLevel >= 300 and MyLevel <= 324 then
+                Mon = "Military Soldier"; Qdata = 1; Qname = "MagmaQuest"; NameMon = "Military Soldier"
+                PosQ = CFrame.new(-5313.37012, 10.9500084, 8515.29395, -0.499959469, 0, 0.866048813, 0, 1, 0, -0.866048813, 0, -0.499959469)
+                PosM = CFrame.new(-5411.16455078125, 11.081554412841797, 8454.29296875)
+            elseif MyLevel >= 325 and MyLevel <= 374 then
+                Mon = "Military Spy"; Qdata = 2; Qname = "MagmaQuest"; NameMon = "Military Spy"
+                PosQ = CFrame.new(-5313.37012, 10.9500084, 8515.29395, -0.499959469, 0, 0.866048813, 0, 1, 0, -0.866048813, 0, -0.499959469)
+                PosM = CFrame.new(-5802.8681640625, 86.26241302490234, 8828.859375)
+            elseif MyLevel >= 375 and MyLevel <= 399 then
+                Mon = "Fishman Warrior"; Qdata = 1; Qname = "FishmanQuest"; NameMon = "Fishman Warrior"
+                PosQ = CFrame.new(61122.65234375, 18.497442245483, 1569.3997802734)
+                PosM = CFrame.new(60878.30078125, 18.482830047607422, 1543.7574462890625)
+            elseif MyLevel >= 400 and MyLevel <= 449 then
+                Mon = "Fishman Commando"; Qdata = 2; Qname = "FishmanQuest"; NameMon = "Fishman Commando"
+                PosQ = CFrame.new(61122.65234375, 18.497442245483, 1569.3997802734)
+                PosM = CFrame.new(61922.6328125, 18.482830047607422, 1493.934326171875)
+            elseif MyLevel >= 450 and MyLevel <= 474 then
+                Mon = "God's Guard"; Qdata = 1; Qname = "SkyExp1Quest"; NameMon = "God's Guard"
+                PosQ = CFrame.new(-4721.88867, 843.874695, -1949.96643, 0.996191859, 0, -0.0871884301, 0, 1, 0, 0.0871884301, 0, 0.996191859)
+                PosM = CFrame.new(-4710.04296875, 845.2769775390625, -1927.3079833984375)
+            elseif MyLevel >= 475 and MyLevel <= 524 then
+                Mon = "Shanda"; Qdata = 2; Qname = "SkyExp1Quest"; NameMon = "Shanda"
+                PosQ = CFrame.new(-7859.09814, 5544.19043, -381.476196, -0.422592998, 0, 0.906319618, 0, 1, 0, -0.906319618, 0, -0.422592998)
+                PosM = CFrame.new(-7678.48974609375, 5566.40380859375, -497.2156066894531)
+            elseif MyLevel >= 525 and MyLevel <= 549 then
+                Mon = "Royal Squad"; Qdata = 1; Qname = "SkyExp2Quest"; NameMon = "Royal Squad"
+                PosQ = CFrame.new(-7906.81592, 5634.6626, -1411.99194, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-7624.25244140625, 5658.13330078125, -1467.354248046875)
+            elseif MyLevel >= 550 and MyLevel <= 624 then
+                Mon = "Royal Soldier"; Qdata = 2; Qname = "SkyExp2Quest"; NameMon = "Royal Soldier"
+                PosQ = CFrame.new(-7906.81592, 5634.6626, -1411.99194, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-7836.75341796875, 5645.6640625, -1790.6236572265625)
+            elseif MyLevel >= 625 and MyLevel <= 649 then
+                Mon = "Galley Pirate"; Qdata = 1; Qname = "FountainQuest"; NameMon = "Galley Pirate"
+                PosQ = CFrame.new(5259.81982, 37.3500175, 4050.0293, 0.087131381, 0, 0.996196866, 0, 1, 0, -0.996196866, 0, 0.087131381)
+                PosM = CFrame.new(5551.02197265625, 78.90135192871094, 3930.412841796875)
+            elseif MyLevel >= 650 then
+                Mon = "Galley Captain"; Qdata = 2; Qname = "FountainQuest"; NameMon = "Galley Captain"
+                PosQ = CFrame.new(5259.81982, 37.3500175, 4050.0293, 0.087131381, 0, 0.996196866, 0, 1, 0, -0.996196866, 0, 0.087131381)
+                PosM = CFrame.new(5441.95166015625, 42.50205993652344, 4950.09375)
+            end
+        elseif SeaIndex == 2 then
+            if MyLevel >= 700 and MyLevel <= 724 then
+                Mon = "Raider"; Qdata = 1; Qname = "Area1Quest"; NameMon = "Raider"
+                PosQ = CFrame.new(-429.543518, 71.7699966, 1836.18188, -0.22495985, 0, -0.974368095, 0, 1, 0, 0.974368095, 0, -0.22495985)
+                PosM = CFrame.new(-728.3267211914062, 52.779319763183594, 2345.7705078125)
+            elseif MyLevel >= 725 and MyLevel <= 774 then
+                Mon = "Mercenary"; Qdata = 2; Qname = "Area1Quest"; NameMon = "Mercenary"
+                PosQ = CFrame.new(-429.543518, 71.7699966, 1836.18188, -0.22495985, 0, -0.974368095, 0, 1, 0, 0.974368095, 0, -0.22495985)
+                PosM = CFrame.new(-1004.3244018554688, 80.15886688232422, 1424.619384765625)
+            elseif MyLevel >= 775 and MyLevel <= 799 then
+                Mon = "Swan Pirate"; Qdata = 1; Qname = "Area2Quest"; NameMon = "Swan Pirate"
+                PosQ = CFrame.new(638.43811, 71.769989, 918.282898, 0.139203906, 0, 0.99026376, 0, 1, 0, -0.99026376, 0, 0.139203906)
+                PosM = CFrame.new(1068.664306640625, 137.61428833007812, 1322.1060791015625)
+            elseif MyLevel >= 800 and MyLevel <= 874 then
+                Mon = "Factory Staff"; Qdata = 2; Qname = "Area2Quest"; NameMon = "Factory Staff"
+                PosQ = CFrame.new(632.698608, 73.1055908, 918.666321, -0.0319722369, 0, -0.999488771, 0, 1, 0, 0.999488771, 0, -0.0319722369)
+                PosM = CFrame.new(73.07867431640625, 81.86344146728516, -27.470672607421875)
+            elseif MyLevel >= 875 and MyLevel <= 899 then
+                Mon = "Marine Lieutenant"; Qdata = 1; Qname = "MarineQuest3"; NameMon = "Marine Lieutenant"
+                PosQ = CFrame.new(-2440.79639, 71.7140732, -3216.06812, 0.866007268, 0, 0.500031412, 0, 1, 0, -0.500031412, 0, 0.866007268)
+                PosM = CFrame.new(-2821.372314453125, 75.89727783203125, -3070.089111328125)
+            elseif MyLevel >= 900 and MyLevel <= 949 then
+                Mon = "Marine Captain"; Qdata = 2; Qname = "MarineQuest3"; NameMon = "Marine Captain"
+                PosQ = CFrame.new(-2440.79639, 71.7140732, -3216.06812, 0.866007268, 0, 0.500031412, 0, 1, 0, -0.500031412, 0, 0.866007268)
+                PosM = CFrame.new(-1861.2310791015625, 80.17658233642578, -3254.697509765625)
+            elseif MyLevel >= 950 and MyLevel <= 974 then
+                Mon = "Zombie"; Qdata = 1; Qname = "ZombieQuest"; NameMon = "Zombie"
+                PosQ = CFrame.new(-5497.06152, 47.5923004, -795.237061, -0.29242146, 0, -0.95628953, 0, 1, 0, 0.95628953, 0, -0.29242146)
+                PosM = CFrame.new(-5657.77685546875, 78.96973419189453, -928.68701171875)
+            elseif MyLevel >= 975 and MyLevel <= 999 then
+                Mon = "Vampire"; Qdata = 2; Qname = "ZombieQuest"; NameMon = "Vampire"
+                PosQ = CFrame.new(-5497.06152, 47.5923004, -795.237061, -0.29242146, 0, -0.95628953, 0, 1, 0, 0.95628953, 0, -0.29242146)
+                PosM = CFrame.new(-6037.66796875, 32.18463897705078, -1340.6597900390625)
+            elseif MyLevel >= 1000 and MyLevel <= 1049 then
+                Mon = "Snow Trooper"; Qdata = 1; Qname = "SnowMountainQuest"; NameMon = "Snow Trooper"
+                PosQ = CFrame.new(609.858826, 400.119904, -5372.25928, -0.374604106, 0, 0.92718488, 0, 1, 0, -0.92718488, 0, -0.374604106)
+                PosM = CFrame.new(549.1473388671875, 427.3870544433594, -5563.69873046875)
+            elseif MyLevel >= 1050 and MyLevel <= 1099 then
+                Mon = "Winter Warrior"; Qdata = 2; Qname = "SnowMountainQuest"; NameMon = "Winter Warrior"
+                PosQ = CFrame.new(609.858826, 400.119904, -5372.25928, -0.374604106, 0, 0.92718488, 0, 1, 0, -0.92718488, 0, -0.374604106)
+                PosM = CFrame.new(1142.7451171875, 475.6398010253906, -5199.41650390625)
+            elseif MyLevel >= 1100 and MyLevel <= 1124 then
+                Mon = "Lab Subordinate"; Qdata = 1; Qname = "IceSideQuest"; NameMon = "Lab Subordinate"
+                PosQ = CFrame.new(-6064.06885, 15.2422857, -4902.97852, 0.453972578, 0, -0.891015649, 0, 1, 0, 0.891015649, 0, 0.453972578)
+                PosM = CFrame.new(-5707.4716796875, 15.951709747314453, -4513.39208984375)
+            elseif MyLevel >= 1125 and MyLevel <= 1174 then
+                Mon = "Horned Warrior"; Qdata = 2; Qname = "IceSideQuest"; NameMon = "Horned Warrior"
+                PosQ = CFrame.new(-6064.06885, 15.2422857, -4902.97852, 0.453972578, 0, -0.891015649, 0, 1, 0, 0.891015649, 0, 0.453972578)
+                PosM = CFrame.new(-6341.36669921875, 15.951770782470703, -5723.162109375)
+            elseif MyLevel >= 1175 and MyLevel <= 1199 then
+                Mon = "Magma Ninja"; Qdata = 1; Qname = "FireSideQuest"; NameMon = "Magma Ninja"
+                PosQ = CFrame.new(-5428.03174, 15.0622921, -5299.43457, -0.882952213, 0, 0.469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
+                PosM = CFrame.new(-5449.6728515625, 76.65874481201172, -5808.20068359375)
+            elseif MyLevel >= 1200 and MyLevel <= 1249 then
+                Mon = "Lava Pirate"; Qdata = 2; Qname = "FireSideQuest"; NameMon = "Lava Pirate"
+                PosQ = CFrame.new(-5428.03174, 15.0622921, -5299.43457, -0.882952213, 0, 0.469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
+                PosM = CFrame.new(-5213.33154296875, 49.73788070678711, -4701.451171875)
+            elseif MyLevel >= 1250 and MyLevel <= 1274 then
+                Mon = "Ship Deckhand"; Qdata = 1; Qname = "ShipQuest1"; NameMon = "Ship Deckhand"
+                PosQ = CFrame.new(1037.80127, 125.092171, 32911.6016)
+                PosM = CFrame.new(1212.0111083984375, 150.79205322265625, 33059.24609375)
+            elseif MyLevel >= 1275 and MyLevel <= 1299 then
+                Mon = "Ship Engineer"; Qdata = 2; Qname = "ShipQuest1"; NameMon = "Ship Engineer"
+                PosQ = CFrame.new(1037.80127, 125.092171, 32911.6016)
+                PosM = CFrame.new(919.4786376953125, 43.54401397705078, 32779.96875)
+            elseif MyLevel >= 1300 and MyLevel <= 1324 then
+                Mon = "Ship Steward"; Qdata = 1; Qname = "ShipQuest2"; NameMon = "Ship Steward"
+                PosQ = CFrame.new(968.80957, 125.092171, 33244.125)
+                PosM = CFrame.new(919.4385375976562, 129.55599975585938, 33436.03515625)
+            elseif MyLevel >= 1325 and MyLevel <= 1349 then
+                Mon = "Ship Officer"; Qdata = 2; Qname = "ShipQuest2"; NameMon = "Ship Officer"
+                PosQ = CFrame.new(968.80957, 125.092171, 33244.125)
+                PosM = CFrame.new(1036.0179443359375, 181.4390411376953, 33315.7265625)
+            elseif MyLevel >= 1350 and MyLevel <= 1374 then
+                Mon = "Arctic Warrior"; Qdata = 1; Qname = "FrostQuest"; NameMon = "Arctic Warrior"
+                PosQ = CFrame.new(5667.6582, 26.7997818, -6486.08984, -0.933587909, 0, -0.358349502, 0, 1, 0, 0.358349502, 0, -0.933587909)
+                PosM = CFrame.new(5966.24609375, 62.97002029418945, -6179.3828125)
+            elseif MyLevel >= 1375 and MyLevel <= 1424 then
+                Mon = "Snow Lurker"; Qdata = 2; Qname = "FrostQuest"; NameMon = "Snow Lurker"
+                PosQ = CFrame.new(5667.6582, 26.7997818, -6486.08984, -0.933587909, 0, -0.358349502, 0, 1, 0, 0.358349502, 0, -0.933587909)
+                PosM = CFrame.new(5407.07373046875, 69.19437408447266, -6880.88037109375)
+            elseif MyLevel >= 1425 and MyLevel <= 1449 then
+                Mon = "Sea Soldier"; Qdata = 1; Qname = "ForgottenQuest"; NameMon = "Sea Soldier"
+                PosQ = CFrame.new(-3054.44458, 235.544281, -10142.8193, 0.990270376, 0, -0.13915664, 0, 1, 0, 0.13915664, 0, 0.990270376)
+                PosM = CFrame.new(-3028.2236328125, 64.67451477050781, -9775.4267578125)
+            elseif MyLevel >= 1450 then
+                Mon = "Water Fighter"; Qdata = 2; Qname = "ForgottenQuest"; NameMon = "Water Fighter"
+                PosQ = CFrame.new(-3054, 240, -10146)
+                PosM = CFrame.new(-3291, 252, -10501)
+            end
+        elseif SeaIndex == 3 then
+            if MyLevel >= 1500 and MyLevel <= 1524 then
+                Mon = "Pirate Millionaire"; Qdata = 1; Qname = "PiratePortQuest"; NameMon = "Pirate Millionaire"
+                PosQ = CFrame.new(-290.074677, 42.9034653, 5581.58984, 0.965929627, -0, -0.258804798, 0, 1, -0, 0.258804798, 0, 0.965929627)
+                PosM = CFrame.new(-245.9963836669922, 47.30615234375, 5584.1005859375)
+            elseif MyLevel >= 1525 and MyLevel <= 1574 then
+                Mon = "Pistol Billionaire"; Qdata = 2; Qname = "PiratePortQuest"; NameMon = "Pistol Billionaire"
+                PosQ = CFrame.new(-290.074677, 42.9034653, 5581.58984, 0.965929627, -0, -0.258804798, 0, 1, -0, 0.258804798, 0, 0.965929627)
+                PosM = CFrame.new(-187.3301544189453, 86.23987579345703, 6013.513671875)
+            elseif MyLevel >= 1575 and MyLevel <= 1599 then
+                Mon = "Dragon Crew Warrior"; Qdata = 1; Qname = "DragonCrewQuest"; NameMon = "Dragon Crew Warrior"
+                PosQ = CFrame.new(6738.96142578125, 127.81645965576172, -713.511474609375)
+                PosM = CFrame.new(6920.71435546875, 56.15597152709961, -942.5044555664062)
+            elseif MyLevel >= 1600 and MyLevel <= 1624 then
+                Mon = "Dragon Crew Archer"; Qdata = 2; Qname = "DragonCrewQuest"; NameMon = "Dragon Crew Archer"
+                PosQ = CFrame.new(6738.96142578125, 127.81645965576172, -713.511474609375)
+                PosM = CFrame.new(6817.91259765625, 484.804443359375, 513.4141235351562)
+            elseif MyLevel >= 1625 and MyLevel <= 1649 then
+                Mon = "Hydra Enforcer"; Qdata = 1; Qname = "VenomCrewQuest"; NameMon = "Hydra Enforcer"
+                PosQ = CFrame.new(5213.8740234375, 1004.5042724609375, 758.6944580078125)
+                PosM = CFrame.new(4584.69287109375, 1002.6435546875, 705.7958984375)
+            elseif MyLevel >= 1650 and MyLevel <= 1699 then
+                Mon = "Venomous Assailant"; Qdata = 2; Qname = "VenomCrewQuest"; NameMon = "Venomous Assailant"
+                PosQ = CFrame.new(5213.8740234375, 1004.5042724609375, 758.6944580078125)
+                PosM = CFrame.new(4638.78564453125, 1078.94091796875, 881.8002319335938)
+            elseif MyLevel >= 1700 and MyLevel <= 1724 then
+                Mon = "Marine Commodore"; Qdata = 1; Qname = "MarineTreeIsland"; NameMon = "Marine Commodore"
+                PosQ = CFrame.new(2180.54126, 27.8156815, -6741.5498, -0.965929747, 0, 0.258804798, 0, 1, 0, -0.258804798, 0, -0.965929747)
+                PosM = CFrame.new(2286.0078125, 73.13391876220703, -7159.80908203125)
+            elseif MyLevel >= 1725 and MyLevel <= 1774 then
+                Mon = "Marine Rear Admiral"; Qdata = 2; Qname = "MarineTreeIsland"; NameMon = "Marine Rear Admiral"
+                PosQ = CFrame.new(2179.98828125, 28.731239318848, -6740.0551757813)
+                PosM = CFrame.new(3656.773681640625, 160.52406311035156, -7001.5986328125)
+            elseif MyLevel >= 1775 and MyLevel <= 1799 then
+                Mon = "Fishman Raider"; Qdata = 2; Qname = "DeepForestIsland3"; NameMon = "Fishman Raider"
+                PosQ = CFrame.new(3142.67822, 108.42981, 7482.37988, 0.34205412, 0, 0.939680243, 0, 1, 0, -0.939680243, 0, 0.34205412)
+                PosM = CFrame.new(-10407.5263671875, 331.76263427734375, -8368.5166015625)
+            elseif MyLevel >= 1800 and MyLevel <= 1824 then
+                Mon = "Fishman Captain"; Qdata = 1; Qname = "DeepForestIsland3"; NameMon = "Fishman Captain"
+                PosQ = CFrame.new(-10581.6563, 330.872955, -8761.18652, -0.882952213, 0, 0.469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
+                PosM = CFrame.new(-10994.701171875, 352.38140869140625, -9002.1103515625)
+            elseif MyLevel >= 1825 and MyLevel <= 1849 then
+                Mon = "Forest Pirate"; Qdata = 2; Qname = "DeepForestIsland"; NameMon = "Forest Pirate"
+                PosQ = CFrame.new(-13234.04, 331.488495, -7625.40137, 0.707134247, -0, -0.707079291, 0, 1, -0, 0.707079291, 0, 0.707134247)
+                PosM = CFrame.new(-13274.478515625, 332.3781433105469, -7769.58056640625)
+            elseif MyLevel >= 1850 and MyLevel <= 1899 then
+                Mon = "Forest Pirate"; Qdata = 1; Qname = "DeepForestIsland"; NameMon = "Forest Pirate"
+                PosQ = CFrame.new(-13234.04, 331.488495, -7625.40137, 0.707134247, -0, -0.707079291, 0, 1, -0, 0.707079291, 0, 0.707134247)
+                PosM = CFrame.new(-13680.607421875, 501.08154296875, -6991.189453125)
+            elseif MyLevel >= 1900 and MyLevel <= 1924 then
+                Mon = "Jungle Pirate"; Qdata = 2; Qname = "DeepForestIsland"; NameMon = "Jungle Pirate"
+                PosQ = CFrame.new(-12680.3818, 389.971039, -9902.01953, -0.0871315002, 0, 0.996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002)
+                PosM = CFrame.new(-12256.16015625, 331.73828125, -10485.8369140625)
+            elseif MyLevel >= 1925 and MyLevel <= 1974 then
+                Mon = "Musketeer Pirate"; Qdata = 2; Qname = "DeepForestIsland2"; NameMon = "Musketeer Pirate"
+                PosQ = CFrame.new(-12680.3818, 389.971039, -9902.01953, -0.0871315002, 0, 0.996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002)
+                PosM = CFrame.new(-13457.904296875, 391.545654296875, -9859.177734375)
+            elseif MyLevel >= 1975 and MyLevel <= 1999 then
+                Mon = "Reborn Skeleton"; Qdata = 1; Qname = "HauntedQuest1"; NameMon = "Reborn Skeleton"
+                PosQ = CFrame.new(-9479.2168, 141.215088, 5566.09277, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+                PosM = CFrame.new(-8763.7236328125, 165.72299194335938, 6159.86181640625)
+            elseif MyLevel >= 2000 and MyLevel <= 2024 then
+                Mon = "Living Zombie"; Qdata = 2; Qname = "HauntedQuest1"; NameMon = "Living Zombie"
+                PosQ = CFrame.new(-9479.2168, 141.215088, 5566.09277, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+                PosM = CFrame.new(-10144.1318359375, 138.62667846679688, 5838.0888671875)
+            elseif MyLevel >= 2025 and MyLevel <= 2049 then
+                Mon = "Demonic Soul"; Qdata = 1; Qname = "HauntedQuest2"; NameMon = "Demonic Soul"
+                PosQ = CFrame.new(-9516.99316, 172.017181, 6078.46533, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-9505.8720703125, 172.10482788085938, 6158.9931640625)
+            elseif MyLevel >= 2050 and MyLevel <= 2074 then
+                Mon = "Posessed Mummy"; Qdata = 2; Qname = "HauntedQuest2"; NameMon = "Posessed Mummy"
+                PosQ = CFrame.new(-9516.99316, 172.017181, 6078.46533, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-9582.0224609375, 6.251527309417725, 6205.478515625)
+            elseif MyLevel >= 2075 and MyLevel <= 2099 then
+                Mon = "Peanut Scout"; Qdata = 1; Qname = "NutsIslandQuest"; NameMon = "Peanut Scout"
+                PosQ = CFrame.new(-2104.3908691406, 38.104167938232, -10194.21875, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-2143.241943359375, 47.72198486328125, -10029.9951171875)
+            elseif MyLevel >= 2100 and MyLevel <= 2124 then
+                Mon = "Peanut President"; Qdata = 1; Qname = "NutsIslandQuest"; NameMon = "Peanut President"
+                PosQ = CFrame.new(-2104.3908691406, 38.104167938232, -10194.21875, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-1859.35400390625, 38.10316848754883, -10422.4296875)
+            elseif MyLevel >= 2125 and MyLevel <= 2149 then
+                Mon = "Ice Cream Chef"; Qdata = 1; Qname = "IceCreamIslandQuest"; NameMon = "Ice Cream Chef"
+                PosQ = CFrame.new(-820.64825439453, 65.819526672363, -10965.795898438, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-872.24658203125, 65.81957244873047, -10919.95703125)
+            elseif MyLevel >= 2150 and MyLevel <= 2199 then
+                Mon = "Ice Cream Commander"; Qdata = 2; Qname = "IceCreamIslandQuest"; NameMon = "Ice Cream Commander"
+                PosQ = CFrame.new(-820.64825439453, 65.819526672363, -10965.795898438, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                PosM = CFrame.new(-558.06103515625, 112.04895782470703, -11290.7744140625)
+            elseif MyLevel >= 2200 and MyLevel <= 2224 then
+                Mon = "Cookie Crafter"; Qdata = 1; Qname = "CakeQuest1"; NameMon = "Cookie Crafter"
+                PosQ = CFrame.new(-2021.32007, 37.7982254, -12028.7295, 0.957576931, -8.80302053e-08, 0.288177818, 6.9301187e-08, 1, 7.51931211e-08, -0.288177818, -5.2032135e-08, 0.957576931)
+                PosM = CFrame.new(-2374.13671875, 37.79826354980469, -12125.30859375)
+            elseif MyLevel >= 2225 and MyLevel <= 2249 then
+                Mon = "Cake Guard"; Qdata = 2; Qname = "CakeQuest1"; NameMon = "Cake Guard"
+                PosQ = CFrame.new(-2021.32007, 37.7982254, -12028.7295, 0.957576931, -8.80302053e-08, 0.288177818, 6.9301187e-08, 1, 7.51931211e-08, -0.288177818, -5.2032135e-08, 0.957576931)
+                PosM = CFrame.new(-1598.3070068359375, 43.773197174072266, -12244.5810546875)
+            elseif MyLevel >= 2250 and MyLevel <= 2274 then
+                Mon = "Baking Staff"; Qdata = 1; Qname = "CakeQuest2"; NameMon = "Baking Staff"
+                PosQ = CFrame.new(-1927.91602, 37.7981339, -12842.5391, -0.96804446, 4.22142143e-08, 0.250778586, 4.74911062e-08, 1, 1.49904711e-08, -0.250778586, 2.64211941e-08, -0.96804446)
+                PosM = CFrame.new(-1887.8099365234375, 77.6185073852539, -12998.3505859375)
+            elseif MyLevel >= 2275 and MyLevel <= 2299 then
+                Mon = "Head Baker"; Qdata = 2; Qname = "CakeQuest2"; NameMon = "Head Baker"
+                PosQ = CFrame.new(-1927.91602, 37.7981339, -12842.5391, -0.96804446, 4.22142143e-08, 0.250778586, 4.74911062e-08, 1, 1.49904711e-08, -0.250778586, 2.64211941e-08, -0.96804446)
+                PosM = CFrame.new(-2216.188232421875, 82.884521484375, -12869.2939453125)
+            elseif MyLevel >= 2300 and MyLevel <= 2324 then
+                Mon = "Cocoa Warrior"; Qdata = 1; Qname = "ChocQuest1"; NameMon = "Cocoa Warrior"
+                PosQ = CFrame.new(233.22836303710938, 29.876001358032227, -12201.2333984375)
+                PosM = CFrame.new(-21.55328369140625, 80.57499694824219, -12352.3876953125)
+            elseif MyLevel >= 2325 and MyLevel <= 2349 then
+                Mon = "Chocolate Bar Battler"; Qdata = 2; Qname = "ChocQuest1"; NameMon = "Chocolate Bar Battler"
+                PosQ = CFrame.new(233.22836303710938, 29.876001358032227, -12201.2333984375)
+                PosM = CFrame.new(582.590576171875, 77.18809509277344, -12463.162109375)
+            elseif MyLevel >= 2350 and MyLevel <= 2374 then
+                Mon = "Sweet Thief"; Qdata = 1; Qname = "ChocQuest2"; NameMon = "Sweet Thief"
+                PosQ = CFrame.new(150.5066375732422, 30.693693161010742, -12774.5029296875)
+                PosM = CFrame.new(165.1884765625, 76.05885314941406, -12600.8369140625)
+            elseif MyLevel >= 2375 and MyLevel <= 2399 then
+                Mon = "Candy Rebel"; Qdata = 2; Qname = "ChocQuest2"; NameMon = "Candy Rebel"
+                PosQ = CFrame.new(150.5066375732422, 30.693693161010742, -12774.5029296875)
+                PosM = CFrame.new(134.86563110351562, 77.2476806640625, -12876.5478515625)
+            elseif MyLevel >= 2400 and MyLevel <= 2424 then
+                Mon = "Candy Pirate"; Qdata = 1; Qname = "CandyQuest1"; NameMon = "Candy Pirate"
+                PosQ = CFrame.new(-1150.0400390625, 20.378934860229492, -14446.3349609375)
+                PosM = CFrame.new(-1310.5003662109375, 26.016523361206055, -14562.404296875)
+            elseif MyLevel >= 2425 and MyLevel <= 2449 then
+                Mon = "Snow Demon"; Qdata = 2; Qname = "CandyQuest1"; NameMon = "Snow Demon"
+                PosQ = CFrame.new(-1150.0400390625, 20.378934860229492, -14446.3349609375)
+                PosM = CFrame.new(-880.2006225585938, 71.24776458740234, -14538.609375)
+            elseif MyLevel >= 2450 and MyLevel <= 2474 then
+                Mon = "Isle Outlaw"; Qdata = 1; Qname = "TikiQuest1"; NameMon = "Isle Outlaw"
+                PosQ = CFrame.new(-16547.748046875, 61.13533401489258, -173.41360473632812)
+                PosM = CFrame.new(-16442.814453125, 116.13899993896484, -264.4637756347656)
+            elseif MyLevel >= 2475 and MyLevel <= 2524 then
+                Mon = "Island Boy"; Qdata = 2; Qname = "TikiQuest1"; NameMon = "Island Boy"
+                PosQ = CFrame.new(-16547.748046875, 61.13533401489258, -173.41360473632812)
+                PosM = CFrame.new(-16901.26171875, 84.06756591796875, -192.88906860351562)
+            elseif MyLevel >= 2525 and MyLevel <= 2574 then
+                Mon = "Isle Champion"; Qdata = 1; Qname = "TikiQuest2"; NameMon = "Isle Champion"
+                PosQ = CFrame.new(-16539.078125, 55.68632888793945, 1051.5738525390625)
+                PosM = CFrame.new(-16641.6796875, 235.7825469970703, 1031.282958984375)
+            elseif MyLevel >= 2575 and MyLevel <= 2599 then
+                Mon = "Skull Slayer"; Qdata = 2; Qname = "TikiQuest3"; NameMon = "Skull Slayer"
+                PosQ = CFrame.new(-16665.1914, 104.596405, 1579.69434, 0.951068401, -0, -0.308980465, 0, 1, -0, 0.308980465, 0, 0.951068401)
+                PosM = CFrame.new(-16887.7305, 113.074638, 1629.97778, -0.559032857, 1.2313353e-08, -0.829145491, 1.05618814e-09, 1, 1.41385428e-08, 0.829145491, 7.02817626e-09, -0.559032857)
+            elseif MyLevel >= 2600 and MyLevel <= 2624 then
+                Mon = "Reef Bandit"; Qdata = 1; Qname = "SubmergedQuest1"; NameMon = "Reef Bandit"
+                PosQ = CFrame.new(10778.875, -2087.72437, 9265.18359, 0.934615612, -9.33109447e-08, -0.355659455, 9.17655143e-08, 1, -2.12154276e-08, 0.355659455, -1.28090019e-08, 0.934615612)
+                PosM = CFrame.new(11019.1318, -2146.06812, 9342.3916, -0.719955266, -1.74275385e-08, 0.69402045, 5.76556367e-08, 1, 8.49211546e-08, -0.69402045, 1.01153624e-07, -0.719955266)
+            elseif MyLevel >= 2625 and MyLevel <= 2649 then
+                Mon = "Coral Pirate"; Qdata = 2; Qname = "SubmergedQuest1"; NameMon = "Coral Pirate"
+                PosQ = CFrame.new(10778.875, -2087.72437, 9265.18359, 0.934615612, -9.33109447e-08, -0.355659455, 9.17655143e-08, 1, -2.12154276e-08, 0.355659455, -1.28090019e-08, 0.934615612)
+                PosM = CFrame.new(10808.6006, -2030.36145, 9364.2334, -0.775185347, -0.0359364748, 0.6307109, 0.0615428537, 0.989336014, 0.132010356, -0.628728986, 0.141148239, -0.764707148)
+            elseif MyLevel >= 2650 and MyLevel <= 2674 then
+                Mon = "Sea Chanter"; Qdata = 1; Qname = "SubmergedQuest2"; NameMon = "Sea Chanter"
+                PosQ = CFrame.new(10880.6855, -2086.20044, 10032.624, -0.321384728, 9.87648434e-08, -0.946948707, 7.13271007e-08, 1, 8.00902953e-08, 0.946948707, -4.18033075e-08, -0.321384728)
+                PosM = CFrame.new(10671.2715, -2057.59155, 10047.2588)
+            elseif MyLevel >= 2675 and MyLevel <= 2699 then
+                Mon = "Ocean Prophet"; Qdata = 2; Qname = "SubmergedQuest2"; NameMon = "Ocean Prophet"
+                PosQ = CFrame.new(10880.6855, -2086.20044, 10032.624, -0.321384728, 9.87648434e-08, -0.946948707, 7.13271007e-08, 1, 8.00902953e-08, 0.946948707, -4.18033075e-08, -0.321384728)
+                PosM = CFrame.new(11008.5195, -2007.72839, 10223.0791, -0.688615739, 2.33523378e-09, -0.725126445, 2.99292546e-09, 1, 3.78221315e-10, 0.725126445, -1.90980032e-09, -0.688615739)
+            elseif MyLevel >= 2700 and MyLevel <= 2724 then
+                Mon = "High Disciple"; Qdata = 1; Qname = "SubmergedQuest3"; NameMon = "High Disciple"
+                PosQ = CFrame.new(9640.08789, -1992.44507, 9613.65234, -0.957327187, 4.11991223e-08, 0.289006323, 1.5775445e-08, 1, -9.02985846e-08, -0.289006323, -8.18860855e-08, -0.957327187)
+                PosM = CFrame.new(9750.41602, -1966.93884, 9753.36035, -0.749824047, 5.57797613e-08, -0.661637306, 2.03500754e-08, 1, 6.1243199e-08, 0.661637306, 3.24572511e-08, -0.749824047)
+            elseif MyLevel >= 2725 then
+                Mon = "Grand Devotee"; Qdata = 2; Qname = "SubmergedQuest3"; NameMon = "Grand Devotee"
+                PosQ = CFrame.new(9640.08789, -1992.44507, 9613.65234, -0.957327187, 4.11991223e-08, 0.289006323, 1.5775445e-08, 1, -9.02985846e-08, -0.289006323, -8.18860855e-08, -0.957327187)
+                PosM = CFrame.new(9611.70508, -1993.47119, 9882.68848, -0.591375351, 4.14332426e-08, -0.806396425, 4.73774868e-08, 1, 1.66361875e-08, 0.806396425, -2.83668058e-08, -0.591375351)
+            end
+        end
+
+        if Mon == "" or not PosM then return nil end
+        return {Mon = Mon, Qdata = Qdata, Qname = Qname, NameMon = NameMon, PosQ = PosQ, PosM = PosM}
+    end
+
+
+    -- ══════════════════════════════════════════════════════════════════
+    -- [ADDED từ message_10] AUTO STORE FRUIT — tự lưu trái cây từ
+    -- Backpack/Character vào inventory (StoreFruit) mỗi 1s.
+    -- Dùng ScriptStorage.IgnoreStoreFruits để tránh lưu trùng trái
+    -- đang được dùng bởi AutoRandomFruit / AutoRaidIce.
+    -- Không dùng checkItem() (message_10 only) → dùng table.find trực tiếp.
+    -- ══════════════════════════════════════════════════════════════════
+    task.spawn(function()
+        while true do
+            pcall(function()
+                local gg = {}
+                for _, container in next, {LocalPlayer.Backpack, LocalPlayer.Character} do
+                    if container then
+                        for _, v in next, container:GetChildren() do
+                            if v.Name:find("Fruit") and v:IsA("Tool") then
+                                local ori = v:GetAttribute("OriginalName") or v.Name
+                                -- Bỏ qua nếu đang bị IgnoreStoreFruits hold
+                                if not table.find(ScriptStorage.IgnoreStoreFruits, v.Name)
+                                and not table.find(ScriptStorage.IgnoreStoreFruits, ori) then
+                                    table.insert(gg, {tool = v, ori = ori})
+                                end
+                            end
+                        end
+                    end
+                end
+                if #gg > 0 then
+                    local sf = {}
+                    local ok, inv = pcall(function()
+                        return Remotes.CommF_:InvokeServer("getInventoryFruits")
+                    end)
+                    if ok and type(inv) == "table" then
+                        for _, _v in pairs(inv) do
+                            if type(_v) == "table" and _v.Name then
+                                sf[_v.Name] = true
+                            end
+                        end
+                    end
+                    for _, v in pairs(gg) do
+                        if not sf[v.ori] then
+                            pcall(function()
+                                Remotes.CommF_:InvokeServer("StoreFruit", v.ori, v.tool)
+                            end)
+                            sf[v.ori] = true
+                        end
+                    end
+                end
+            end)
+            -- Cousin DLCBoxData ping (từ message_10 — giữ như gốc)
+            pcall(function()
+                Remotes.CommF_:InvokeServer("Cousin", "DLCBoxData")
+            end)
+            task.wait(1)
+        end
+    end)
+
+    -- [ADDED] AUTO RANDOM FRUIT — tự đổi ngẫu nhiên giữa các trái ÁC QUỶ
+    -- đang sở hữu trong túi đồ. Dùng getInventoryFruits (lấy danh sách trái
+    -- đang có) + LoadFruit (trang bị) — cả 2 remote này đã CÓ THẬT và được
+    -- dùng sẵn ở AutoRaidIce.GetCheapestFruit/BuyChip trong chính file này,
+    -- không phải tự chế. Đọc Config.Items.AutoRandomFruit (đúng convention
+    -- của file — mọi feature khác đều đọc thẳng Config.Items.X, không qua
+    -- _G mirror).
+    task.spawn(function()
+        while task.wait(30) do
+            pcall(function()
+                if not Config.Items.AutoRandomFruit then return end
+                local ok, inventoryFruits = pcall(function()
+                    return Remotes.CommF_:InvokeServer("getInventoryFruits")
+                end)
+                if not ok or type(inventoryFruits) ~= "table" then return end
+                local names = {}
+                for _, fruitData in pairs(inventoryFruits) do
+                    if fruitData and fruitData.Name then
+                        table.insert(names, fruitData.Name)
+                    end
+                end
+                if #names == 0 then return end
+                local picked = names[math.random(1, #names)]
+                table.insert(ScriptStorage.IgnoreStoreFruits, picked)
+                Remotes.CommF_:InvokeServer("LoadFruit", picked)
+            end)
+        end
+    end)
+
+    -- ══════════════════════════════════════════════════════════════════
+    -- [REPLACED per promt_fix_kaitun — PATCH #1] CheckDataLevel từ message(10)
+    -- ⚠️ CẢNH BÁO: kiến trúc ánh xạ CỨNG level→quái (lv<70→Shanda, lv<120→God's Guard)
+    -- KHÔNG check vị trí thật trên map — rủi ro đơ nếu vị trí không khớp.
+    -- Đây y chang kiểu đã được DynamicIsland gỡ trước đó. Port lại per boss man.
+    -- Ánh xạ: plr.Data.Level.Value → ScriptStorage.PlayerData.Level
+    -- ══════════════════════════════════════════════════════════════════
+    FunctionsHandler.LevelFarm:RegisterMethod("Refresh", function()
+        -- Guard chống xung đột AutoSea3/AutoSea2
+        if _G.SeaTransitionActive then return nil end
+
+        local lv = ScriptStorage.PlayerData.Level or 0
+        -- Ánh xạ y hệt message(10) CheckDataLevel()
+        if lv < 10 then
+            return 1
+        elseif lv < 70 then
+            return 2   -- Shanda @ Upper Skylands
+        elseif lv < 120 then
+            return 3   -- God's Guard @ Skylands
+        else
+            return 4
+        end
+    end)
+    -- ══════════════════════════════════════════════════════════════════
+    -- [REPLACED per promt_fix_kaitun — PATCH #2] Chuyển thể FarmLevelLogic
+    -- Ánh xạ Bước 2:
+    --   plr.Data.Level.Value   → ScriptStorage.PlayerData.Level
+    --   PLACE_ID.sea1/2/3()   → SeaIndex == 1/2/3
+    --   bringMob+equipWeapon+FastAttack → CombatController.Attack(name)
+    --   CheckMonster(name)    → không cần (đã có trong CombatController.Attack)
+    --   Teleport("sky 3/2")   → TweenController.Create trực tiếp (không requestEntrance)
+    --                           + TweenController.Create fallback
+    -- Giải pháp HYBRID (Cách 1): thêm check vị trí thật (CurrentLocation)
+    -- TRƯỚC khi TweenController.Create — vừa dùng logic message(10), vừa không đơ.
+    -- ══════════════════════════════════════════════════════════════════
+    FunctionsHandler.LevelFarm:RegisterMethod("Start", function(h)
+        local currentLevel = ScriptStorage.PlayerData.Level or 0
+
+        -- Guard: đã lên đủ level sang Sea 2 → không farm Sea 1 nữa
+        if currentLevel >= 700 and SeaIndex == 1 then return end
+
+        -- ── Sea 3: farm Bones nếu cần (giữ nguyên bản DynamicIsland gốc)
+        if SeaIndex == 3 then
+            if (ScriptStorage.Backpack.Bones or {Count = 0}).Count >= 50 then
+                if os.time() > (BonesCooldown or 0) then
+                    local X, X, X, w = Remotes.CommF_:InvokeServer("Bones", "Check")
+                    if tonumber(X or 1) == 0 then
+                        local X = Split(w, ":")
+                        local w = ((tonumber(X[1]) * 60) + tonumber(X[2])) * 60
+                        BonesCooldown = os.time() + w
+                    else
+                        Remotes.CommF_:InvokeServer("Bones", "Buy", 1, 1)
+                    end
+                end
+            end
+        end
+
+        -- ═══ h == 2: level 10–69 → farm Shanda @ Upper Skylands ═══════
+        -- Tương đương nhánh `levelData == 2` của message(10).txt
+        -- Teleport("sky 3") → TweenController.Create Upper Skylands
+        if h == 2 then
+            if SeaIndex == 1 then
+                local loc = LocalPlayer:GetAttribute("CurrentLocation")
+                if not loc or (loc ~= "Skylands" and loc ~= "Upper Skylands") then
+                    -- [FIXED] Bỏ requestEntrance, chỉ dùng tween
+                    TweenController.Create(CFrame.new(-7894, 5547, -380))
+                    task.wait(1)
+                    return
+                end
+            end
+            SetTask("MainTask", "Level Farm | Shanda | Upper Skylands")
+
+            local foundMob = false
+            for _, folder in ipairs({workspace.Enemies, game.ReplicatedStorage}) do
+                for _, v2 in ipairs(folder:GetChildren()) do
+                    if v2.Name == "Shanda" and v2:IsA("Model") then
+                        local hum = v2:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            foundMob = true
+                            SetTask("SubTask", "⚔️ Attacking Shanda")
+                            CombatController.Attack("Shanda")
+                            break
+                        end
+                    end
+                end
+                if foundMob then break end
+            end
+            if not foundMob then
+                local spawnFolder = game.ReplicatedStorage:FindFirstChild("FortBuilderReplicatedSpawnPositionsFolder")
+                local n = spawnFolder and spawnFolder:FindFirstChild("Shanda")
+                if n then
+                    TweenController.Create(n:GetPivot() + Vector3.new(0, 25, 0))
+                else
+                    TweenController.Create(CFrame.new(-7783, 5576, -519))
+                end
+            end
+
+        -- ═══ h == 3: level 70–119 → farm God's Guard @ Skylands ══════
+        -- Tương đương nhánh `levelData == 3` của message(10).txt
+        -- Teleport("sky 2") → TweenController.Create Skylands
+        elseif h == 3 then
+            if SeaIndex == 1 then
+                local loc = LocalPlayer:GetAttribute("CurrentLocation")
+                if not loc or (loc ~= "Skylands" and loc ~= "Upper Skylands") then
+                    -- [FIXED] Bỏ requestEntrance, chỉ dùng tween
+                    TweenController.Create(CFrame.new(-4650, 872, -1775))
+                    task.wait(1.5)
+                    return
+                end
+            end
+            SetTask("MainTask", "Level Farm | God's Guard | Skylands")
+
+            local foundMob = false
+            for _, folder in ipairs({workspace.Enemies, game.ReplicatedStorage}) do
+                for _, v2 in ipairs(folder:GetChildren()) do
+                    if v2.Name == "God's Guard" and v2:IsA("Model") then
+                        local hum = v2:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            foundMob = true
+                            SetTask("SubTask", "⚔️ Attacking God's Guard")
+                            CombatController.Attack("God's Guard")
+                            break
+                        end
+                    end
+                end
+                if foundMob then break end
+            end
+            if not foundMob then
+                local spawnFolder = game.ReplicatedStorage:FindFirstChild("FortBuilderReplicatedSpawnPositionsFolder")
+                local n = spawnFolder and spawnFolder:FindFirstChild("God's Guard")
+                if n then
+                    TweenController.Create(n:GetPivot() + Vector3.new(0, 25, 0))
+                end
+            end
+
+        -- ═══ h == 4 / h == 1: farm chung qua ManualLevelLookup ════════
+        else
+            local Q = ManualLevelLookup()
+            if not Q then
+                Report("LevelFarm: ManualLevelLookup không tìm được mốc (lv="
+                    .. tostring(currentLevel) .. ", sea=" .. tostring(SeaIndex) .. ")")
+                return
+            end
+            SetTask("SubTask", "📋 " .. Q.NameMon .. " | Quest: " .. Q.Mon)
+
+            local activeQuestName = GetActiveQuestName()
+            if activeQuestName ~= nil then
+                if activeQuestName ~= false then
+                    if activeQuestName ~= Q.Qname then return J.AbandonQuest() end
+                else
+                    if not Q.PosQ then return end
+                    TweenController.Create(Q.PosQ + Vector3.new(0, 5, 3))
+                    SetTask("MainTask", "Level Farm | " .. Q.Mon .. " | Nhận Quest")
+                    if CaculateDistance(Q.PosQ) > 10 then return end
+                    task.wait(0.5)
+                    LevelFarmTTL = 0
+                    J.StartQuest(Q.Qname, Q.Qdata)
+                    task.wait(0.3)
+                end
+            else
+                CurrentClaimQuest1 = GetCurrentClaimQuest()
+                if CurrentClaimQuest1 then
+                    if CurrentClaimQuest1 ~= Q.NameMon and CurrentClaimQuest1 ~= (Q.NameMon .. "s") then
+                        return J.AbandonQuest()
+                    end
+                else
+                    if not Q.PosQ then return end
+                    TweenController.Create(Q.PosQ + Vector3.new(0, 5, 3))
+                    SetTask("MainTask", "Level Farm | " .. Q.Mon .. " | Nhận Quest")
+                    if CaculateDistance(Q.PosQ) > 10 then return end
+                    task.wait(0.5)
+                    LevelFarmTTL = 0
+                    J.StartQuest(Q.Qname, Q.Qdata)
+                    task.wait(0.3)
+                end
+            end
+            -- CombatController.Attack tự làm: tìm quái + tween + đánh
+            -- (thay thế bringMob + equipWeapon + FastAttack + CheckMonster)
+            CombatController.Attack(Q.Mon)
+        end
+    end)
+
+    -- ============================================================
+    -- EQUIP WEAPON (TỪ TEST.TXT - ĐÃ CÓ SẴN TRONG CombatController.Attack)
+    -- ============================================================
+    FunctionsHandler.LocalPlayerController:RegisterMethod("EquipTool", function(h)
+        if not Humanoid then return end
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        if not bp then return end
+        for X, X in bp:GetChildren() do
+            if X:IsA('Tool') and X.Name ~= "Tool" and (X.Name == tostring(h) or X.ToolTip == h) then
+                LocalPlayer.Character:WaitForChild('Humanoid'):EquipTool(X)
+            end
+        end
+    end)
+    FunctionsHandler.LocalPlayerController:RegisterMethod('ToggleAbilities', function(h, X)
+        if h == 'Buso' then
+            if LocalPlayer:HasTag('Buso') and not X or X then Remotes.CommF_:InvokeServer('Buso') end
+        elseif h == "Observation" then
+        end
+    end)
+    FunctionsHandler.LocalPlayerController:RegisterMethod('ConfigurationAbilitiesToggle', function()
+        FunctionsHandler.LocalPlayerController.Methods.ToggleAbilities:Call('Buso', SCRIPT_CONFIG.BUSO)
+        FunctionsHandler.LocalPlayerController.Methods.ToggleAbilities:Call('Observation', SCRIPT_CONFIG.OBSERVATION)
+    end)
+    print(3)
+
+    -- ============================================================
+    -- SABER QUEST - HOÀN CHỈNH
+    -- ============================================================
+    FunctionsHandler.Saber:RegisterMethod('Refresh', function()
+        if not Config.Items.Saber then return end
+        if ScriptStorage.Backpack.Saber then return end
+        if ScriptStorage.PlayerData.Level < 200 then return end
+        local X = Remotes.CommF_:InvokeServer('ProQuestProgress')
+        local h
+        for w, w in X.Plates do if w == false then h = 1 end end
+        if not h then
+            if not X.UsedTorch then h = 2
+            elseif not X.UsedCup then h = 3
+            elseif not X.TalkedSon then h = 4
+            elseif not X.KilledMob then h = 5
+            elseif not X.UsedRelic then h = 6
+            elseif not X.KilledShanks and ScriptStorage.Enemies["Saber Expert"] then h = 7 end
+        end
+        FunctionsHandler.Saber:Set("CurrentProgressLevel", h)
+        FunctionsHandler.Saber:Set('LastestRefreshSenque', os.time())
+        return h
+    end)
+
+    FunctionsHandler.Saber:RegisterMethod('GetQuestplates', function()
+        local h = FunctionsHandler.Saber:Get("QuestplatesCache")
+        if h then return h end
+        local h = Services.Workspace.Map.Jungle
+        local X = {}
+        table.foreach(h.QuestPlates:GetChildren(), function(h, w) h = w:FindFirstChild("Button") and table.insert(X, w) end)
+        FunctionsHandler.Saber:Set('QuestplatesCache', X)
+        return X
+    end)
+
+    FunctionsHandler.Saber:RegisterMethod('Start', function()
+        local h, X = FunctionsHandler.Saber:Get("CurrentProgressLevel"), FunctionsHandler.Saber:Get('LastestRefreshSenque')
+        if not h then
+            FunctionsHandler.Saber.Methods.Refresh:Call()
+            return FunctionsHandler.Saber.Methods.Start:Call()
+        elseif h == 0 then
+        elseif os.time() - X > 60 then
+            FunctionsHandler.Saber.Methods.Refresh:Call()
+            return FunctionsHandler.Saber.Methods.Start:Call()
+        else
+            if h == 1 then
+                local X = FunctionsHandler.Saber.Methods.GetQuestplates:Call()
+                for w, D in X do
+                    SetTask('MainTask', "Saber Quest | Quest Plates | Touching " .. w .. "/5")
+                    while CaculateDistance(D.Button.CFrame) > 20 do
+                        task.wait()
+                        TweenController.Create(D.Button.CFrame)
+                    end
+                    task.wait(1)
+                end
+            elseif h == 2 then
+                SetTask('MainTask', 'Saber Quest | Torch Puzzle | Using Torch')
+                Remotes.CommF_:InvokeServer("ProQuestProgress", 'GetTorch')
+                task.wait(1)
+                Remotes.CommF_:InvokeServer('ProQuestProgress', "DestroyTorch")
+            elseif h == 3 then
+                SetTask('MainTask', "Saber Quest | Sick Man | Helping with Cup")
+                Remotes.CommF_:InvokeServer('ProQuestProgress', "GetCup")
+                if ScriptStorage.Tools.Cup then
+                    FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call('Cup')
+                    task.wait(1)
+                    Remotes.CommF_:InvokeServer("ProQuestProgress", 'FillCup', LocalPlayer.Character.Cup)
+                end
+                Remotes.CommF_:InvokeServer("ProQuestProgress", 'SickMan')
+            elseif h == 4 then
+                SetTask('MainTask', 'Saber Quest | Rich Son | Getting Information')
+                Remotes.CommF_:InvokeServer('ProQuestProgress', 'RichSon')
+            elseif h == 5 then
+                SetTask("MainTask", "Saber Quest | Mob Leader | Defeating Boss")
+                CombatController.Attack('Mob Leader')
+            elseif h == 6 then
+                SetTask("MainTask", 'Saber Quest | Relic | Placing at Location')
+                Remotes.CommF_:InvokeServer('ProQuestProgress', 'RichSon')
+                Remotes.CommF_:InvokeServer("ProQuestProgress", "PlaceRelic")
+            elseif h == 7 then
+                SetTask('MainTask', "Saber Quest | Saber Expert | Final Battle")
+                CombatController.Attack("Saber Expert")
+            end
+        end
+    end)
+    Remotes.RefreshQuestPro.OnClientEvent:Connect(FunctionsHandler.Saber.Methods.Refresh.Callback)
+
+    -- ============================================================
+    -- SECOND SEA PUZZLE (DRESSROSA)
+    -- ============================================================
+    FunctionsHandler.SecondSeaPuzzle:RegisterMethod('Refresh', function()
+        if ScriptStorage.PlayerData.Level < 700 or SeaIndex ~= 1 then return end
+        if FunctionsHandler.SecondSeaPuzzle:Get('IsCompleted') then return end
+        local k = Remotes.CommF_:InvokeServer('DressrosaQuestProgress')
+        if not k.TalkedDetective then Result = 1
+        elseif not k.KilledIceBoss then Result = 2
+        else FunctionsHandler.SecondSeaPuzzle:Set("IsCompleted", true) end
+        FunctionsHandler.SecondSeaPuzzle:Set("CurrentProgressLevel", Result)
+        FunctionsHandler.SecondSeaPuzzle:Set('LastestRefreshSenque', os.time())
+        return Result
+    end)
+
+    FunctionsHandler.SecondSeaPuzzle:RegisterMethod("Start", function()
+        local k, h = FunctionsHandler.SecondSeaPuzzle:Get('CurrentProgressLevel'), FunctionsHandler.SecondSeaPuzzle:Get('LastestRefreshSenque')
+        FunctionsHandler.SecondSeaPuzzle:Set('CurrentProgressLevel', nil)
+        if not k then
+            FunctionsHandler.SecondSeaPuzzle.Methods.Refresh:Call()
+            return FunctionsHandler.SecondSeaPuzzle.Methods.Start:Call()
+        elseif k == 1 then
+            SetTask('SubTask', '🧩 Sea2: Talk to Detective')
+            SetTask('MainTask', "Auto Second Sea - Talk To Detective")
+            Remotes.CommF_:InvokeServer('DressrosaQuestProgress', 'Detective')
+            Remotes.CommF_:InvokeServer("DressrosaQuestProgress", "Detective")
+            task.wait(1)
+            Remotes.CommF_:InvokeServer('DressrosaQuestProgress', 'UseKey')
+        elseif k == 2 then
+            SetTask('SubTask', '🧩 Sea2: Defeat Ice Admiral')
+            Remotes.CommF_:InvokeServer("DressrosaQuestProgress", "Detective")
+            Remotes.CommF_:InvokeServer('DressrosaQuestProgress', 'Detective')
+            task.wait(1)
+            Remotes.CommF_:InvokeServer('DressrosaQuestProgress', 'UseKey')
+            SetTask("MainTask", "Auto Second Sea - Defeating Ice Admiral")
+            CombatController.Attack("Ice Admiral")
+            Remotes.CommF_:InvokeServer('TravelDressrosa')
+        end
+    end)
+
+    -- ============================================================
+    -- COLOSSEUM PUZZLE (BARTILO)
+    -- ============================================================
+    FunctionsHandler.ColosseumPuzzle:RegisterMethod("Refresh", function()
+        if SeaIndex ~= 2 then return end
+        if ScriptStorage.PlayerData.Level < 850 or ScriptStorage.Backpack['Warrior Helmet'] then return end
+        local k = Remotes.CommF_:InvokeServer("BartiloQuestProgress")
+        if not k.KilledBandits then Result = 1
+        elseif not k.KilledSpring then
+            if ScriptStorage.Enemies.Jeremy then Result = 2 end
+        elseif not k.DidPlates then Result = 3 end
+        FunctionsHandler.ColosseumPuzzle:Set("CurrentProgressLevel", Result)
+        FunctionsHandler.ColosseumPuzzle:Set("LastestRefreshSenque", os.time())
+        return Result
+    end)
+
+    FunctionsHandler.ColosseumPuzzle:RegisterMethod('Start', function()
+        local k, h = FunctionsHandler.ColosseumPuzzle:Get("CurrentProgressLevel"), FunctionsHandler.ColosseumPuzzle:Get("LastestRefreshSenque")
+        FunctionsHandler.ColosseumPuzzle:Set("CurrentProgressLevel", nil)
+        if not k then
+            FunctionsHandler.ColosseumPuzzle.Methods.Refresh:Call()
+            return FunctionsHandler.ColosseumPuzzle.Methods.Start:Call()
+        elseif k == 1 then
+            SetTask("MainTask", 'Auto Bartilo Quest - Defeating 50x Swan Pirate')
+            local h, X = J:GetCurrentClaimQuest()
+            if h then
+                if not string.find(X, '50') then J.AbandonQuest()
+                else CombatController.Attack("Swan Pirate") end
+            else
+                J.StartQuest('BartiloQuest', 1)
+            end
+        elseif k == 2 then
+            SetTask('MainTask', "Auto Bartilo Quest - Defeating Jeremy")
+            CombatController.Attack("Jeremy")
+        elseif k == 3 then
+            SetTask("MainTask", 'Auto Bartilo Quest - Doing Puzzle')
+            if CaculateDistance(CFrame.new(-1837.46155, 44.2921753, 1656.1987, 0.999881566, -1.03885048e-22, -0.0153914848, 1.07805858e-22, 1, 2.53909284e-22, 0.0153914848, -2.55538502e-22, 0.999881566)) > 10 then
+                alert("tween to")
+                TweenController.Create(CFrame.new(-1837.46155, 44.2921753, 1656.1987, 0.999881566, -1.03885048e-22, -0.0153914848, 1.07805858e-22, 1, 2.53909284e-22, 0.0153914848, -2.55538502e-22, 0.999881566))
+            else
+                LocalPlayer = game.Players.LocalPlayer
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1836.0, 11, 1714)
+                alert("1")
+                task.wait(.5)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1850.49329, 13.1789551, 1750.89685)
+                alert('2')
+                task.wait(1)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1858.87305, 19.3777466, 1712.01807)
+                alert("3")
+                task.wait(1)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1803.94324, 16.5789185, 1750.89685)
+                task.wait(1)
+                alert("4")
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1858.55835, 16.8604317, 1724.79541)
+                task.wait(1)
+                alert('5')
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1869.54224, 15.987854, 1681.00659)
+                task.wait(1)
+                alert("6")
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1800.0979, 16.4978027, 1684.52368)
+                task.wait(1)
+                alert("7")
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1819.26343, 14.795166, 1717.90625)
+                task.wait(1)
+                alert("8")
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-1813.51843, 14.8604736, 1724.79541)
+            end
+        end
+    end)
+
+    -- ============================================================
+    -- EVOLUTION RACE (RACE V2)
+    -- ============================================================
+    FunctionsHandler.EvoRace:RegisterMethod("Refresh", function()
+        if not Config.Items.RaceV2 then return end
+        if SeaIndex ~= 2 then return end
+        if getsenv(game.ReplicatedStorage.GuideModule)._G.ServerData.ExpBoost ~= 0 or ScriptStorage.PlayerData.Level < 900 or ScriptStorage.PlayerData.Beli < 1000000 or ScriptStorage.PlayerData.RaceLevel ~= 1 then return end
+        return true
+    end)
+
+    FunctionsHandler.EvoRace:RegisterMethod('Start', function()
+        Remotes.CommF_:InvokeServer('Alchemist', "1")
+        Remotes.CommF_:InvokeServer('Alchemist', '2')
+        for k = 1, 2, 1 do
+            SetTask('SubTask', '🌈 Collecting Flower ' .. k .. ' for Race V2')
+            local h = ScriptStorage.Tools["Flower " .. k]
+            local X = Services.Workspace:FindFirstChild('Flower' .. k)
+            if not h then
+                if X and X.Transparency == 0 then
+                    SetTask('MainTask', 'Auto Race V2 - Collecting Flower ' .. k)
+                    while not ScriptStorage.Tools["Flower " .. k] do
+                        task.wait()
+                        TweenController.Create(X.CFrame + Vector3.new(0, math.random(-1.0, 2), 0))
+                    end
+                end
+            end
+        end
+        if not ScriptStorage.Tools['Flower 3'] then
+            SetTask('SubTask', '🌈 Farming Swan Pirate for Flower 3')
+            SetTask('MainTask', 'Auto Race V2 - Collecting Flower ' .. 3)
+            CombatController.Attack('Swan Pirate')
+        else
+            SetTask('SubTask', '🌈 Race V2 completed, idling...')
+            SetTask("MainTask", 'Auto Race V2 - Idling')
+            if LocalPlayer.Character.HumanoidRootPart.CFrame.Y < 50000 then
+                TweenController.Create(LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 50, 0))
+            end
+            Remotes.CommF_:InvokeServer("Alchemist", "3")
+            RefreshRace()
+        end
+    end)
+
+    -- ============================================================
+    -- [REBUILT] RACE AWAKENING (= "Race V3") — bị mất sạch RegisterMethod
+    -- trong 1 lượt sửa lớn trước đó (chỉ còn :Register() trơ), audit lại
+    -- toàn bộ file mới phát hiện. Xây lại từ data verified NatAov +
+    -- raw_6.txt + message_10.txt (nguồn MỚI NHẤT, verified nhất).
+    -- [FIXED - theo message_10] Thứ tự boss Human THẬT là Jeremy → Diamond
+    -- → Orbitus — bản trước tao để SAI thành Orbitus→Jeremy→Diamond. Có cả
+    -- toạ độ chờ thật cho từng bước. Dùng Wenlocktoad("1") LÀM STATE DRIVER
+    -- (đọc từ server mỗi lần) thay vì cờ nội bộ `_raceAwakenState.started`
+    -- dễ bị lệch nếu script restart giữa chừng.
+    -- [NEW - theo message_10] Thêm race Mink ("Rabbit" trong Race.Value):
+    -- farm 30 cái workspace.ChestModels rồi claim — hoàn toàn không có
+    -- trước đây.
+    -- Race Fishman: GIỮ NGUYÊN y hệt bản cũ theo đúng yêu cầu ("trừ tộc cá
+    -- fishman") — không đụng vào đoạn Sea Beast/skill hotbar bên dưới.
+    -- ============================================================
+    local _raceAwakenState = {
+        humanStage = 0,  -- 0=Jeremy, 1=Diamond, 2=Orbitus, 3=claim
+        minkChestsDone = 0,
+    }
+    local HUMAN_V3_WAIT_CF = {
+        [0] = CFrame.new(2333.209228515625, 449.2427062988281, 699.5128784179688),   -- chờ Jeremy
+        [1] = CFrame.new(-1713.5589599609375, 198.99554443359375, -104.31584167480469), -- chờ Diamond
+        [2] = CFrame.new(-2148.7568359375, 73.27831268310547, -4304.4130859375),     -- chờ Orbitus
+    }
+    local HUMAN_V3_BOSS_NAME = {[0] = "Jeremy", [1] = "Diamond", [2] = "Orbitus"}
+
+    local function _fightWorldBossV3(bossName, waitCF)
+        local live = ScriptStorage.Enemies[bossName]
+        if not live then
+            SetTask("SubTask", "Race Awakening | Chờ " .. bossName .. " — di chuyển tới điểm hẹn")
+            if waitCF then TweenController.Create(waitCF) end
+            return false
+        end
+        local hum = live:FindFirstChildOfClass("Humanoid")
+        local hrp = live:FindFirstChild("HumanoidRootPart")
+        if hum and hrp and hum.Health > 0 then
+            SetTask("MainTask", "Race Awakening | Fighting " .. bossName)
+            TweenController.Create(hrp.CFrame + Vector3.new(0, 30, 0))
+            if not LocalPlayer.Character:FindFirstChild("HasBuso") then
+                pcall(function() Remotes.CommF_:InvokeServer("Buso") end)
+            end
+            CombatController.Attack(bossName)
+            return false
+        end
+        return true -- dead
+    end
+
+    FunctionsHandler.RaceAwakening:RegisterMethod("Refresh", function()
+        if not Config.Items.AutoRaceV3 then return nil end
+        local data = LocalPlayer:FindFirstChild("Data")
+        if not data or not data:FindFirstChild("Race") then return nil end
+        if data.Race:FindFirstChild("Evolved") then return nil end -- đã Awaken rồi
+        local raceVal = data.Race.Value
+        if raceVal ~= "Human" and raceVal ~= "Fishman" and raceVal ~= "Rabbit" then return nil end
+        if (ScriptStorage.PlayerData.Level or 0) < 1400 then return nil end
+        if (ScriptStorage.PlayerData.Beli or 0) < 2000000 then return nil end
+        local wOk = pcall(function() return Remotes.CommF_:InvokeServer("Wenlocktoad", "3") end)
+        local wResult = wOk and Remotes.CommF_:InvokeServer("Wenlocktoad", "3") or nil
+        if wResult == -2 then return nil end
+        local tOk, tResult = pcall(function() return Remotes.CommF_:InvokeServer("TalkTrevor", "1") end)
+        if not tOk or tResult ~= 0 then return nil end
+        return true
+    end)
+
+    FunctionsHandler.RaceAwakening:RegisterMethod("Start", function()
+        local data = LocalPlayer:FindFirstChild("Data")
+        if not data or not data:FindFirstChild("Race") then return end
+        local race = data.Race.Value
+
+        -- [FIXED] Dùng Wenlocktoad("1") làm state driver thật, đọc lại mỗi
+        -- lần thay vì tin cờ nội bộ — khớp state-machine verified message_10
+        local check = Remotes.CommF_:InvokeServer("Wenlocktoad", "1")
+
+        if check == 0 then
+            SetTask("MainTask", "Race Awakening | Bắt đầu quest (Wenlocktoad)")
+            Remotes.CommF_:InvokeServer("Wenlocktoad", "2")
+            return
+        elseif check == 2 then
+            SetTask("MainTask", "Race Awakening | Đủ điều kiện — claim!")
+            Remotes.CommF_:InvokeServer("Wenlocktoad", "3")
+            return
+        elseif check ~= 1 then
+            return -- giá trị lạ, chờ vòng sau
+        end
+
+        -- check == 1: đang trong giai đoạn đánh boss/farm theo race
+        if race == "Human" then
+            local stage = _raceAwakenState.humanStage
+            if stage >= 3 then
+                SetTask("MainTask", "Race Awakening | Hoàn thành 3 boss — claim!")
+                Remotes.CommF_:InvokeServer("Wenlocktoad", "3")
+                _raceAwakenState.humanStage = 0
+                return
+            end
+            local bossName = HUMAN_V3_BOSS_NAME[stage]
+            SetTask("SubTask", "Race Awakening | " .. (stage + 1) .. "/3 " .. bossName)
+            if _fightWorldBossV3(bossName, HUMAN_V3_WAIT_CF[stage]) then
+                _raceAwakenState.humanStage = stage + 1
+            end
+
+        elseif race == "Rabbit" then
+            -- [NEW - Mink] Farm 30 ChestModels rồi claim
+            local chestFolder = workspace:FindFirstChild("ChestModels")
+            if not chestFolder then
+                SetTask("SubTask", "Race Awakening | Mink: không tìm thấy ChestModels")
+                return
+            end
+            if _raceAwakenState.minkChestsDone >= 30 then
+                SetTask("MainTask", "Race Awakening | Mink: đủ 30 rương — claim!")
+                Remotes.CommF_:InvokeServer("Wenlocktoad", "3")
+                return
+            end
+            local chests = chestFolder:GetChildren()
+            local idx = _raceAwakenState.minkChestsDone + 1
+            local chest = chests[idx]
+            if chest and chest:FindFirstChild("WorldPivot") then
+                SetTask("MainTask", "Race Awakening | Mink: rương " .. idx .. "/30")
+                TweenController.Create(chest.WorldPivot.Position)
+                if CaculateDistance(chest.WorldPivot.Position) < 10 then
+                    _raceAwakenState.minkChestsDone = _raceAwakenState.minkChestsDone + 1
+                end
+            else
+                SetTask("SubTask", "Race Awakening | Mink: hết rương khả dụng (" .. #chests .. " tổng)")
+            end
+
+        elseif race == "Fishman" then
+            -- (GIỮ NGUYÊN không đổi — theo đúng yêu cầu loại trừ Fishman)
+            SetTask("MainTask", "Race Awakening | Fishman: farm Sea Beast")
+            local seaBeasts = Services.Workspace:FindFirstChild("SeaBeasts")
+            if not seaBeasts then
+                SetTask("SubTask", "⚠️ Không tìm thấy workspace.SeaBeasts — hop thử")
+                Hop()
+                return
+            end
+            pcall(function() Remotes.CommF_:InvokeServer("BuyFishmanKarate") end)
+            local target = nil
+            for _, beast in pairs(seaBeasts:GetChildren()) do
+                local h = beast:FindFirstChild("Health")
+                local hrp = beast:FindFirstChild("HumanoidRootPart")
+                if h and hrp and h.Value > 0 then target = beast break end
+            end
+            if not target then
+                SetTask("SubTask", "Fishman | Chưa thấy Sea Beast, đợi spawn...")
+                task.wait(3)
+                return
+            end
+            TweenController.Create(target.HumanoidRootPart.CFrame * CFrame.new(0, 3, 0))
+            if CaculateDistance(target.HumanoidRootPart.CFrame) < 15 then
+                pcall(function()
+                    FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call("Fishman Karate")
+                end)
+                SetTask("SubTask", "Fishman | Đang đánh Sea Beast (skill Z/X/C)")
+                pcall(function()
+                    Services.VirtualInputManager:SendKeyEvent(true, "Z", false, game)
+                    task.wait(0.3)
+                    Services.VirtualInputManager:SendKeyEvent(false, "Z", false, game)
+                end)
+            end
+        end
+    end)
+
+    -- ============================================================
+    -- BOSSES TASK
+    -- ============================================================
+    -- ============================================================
+    -- [FIXED] Xác nhận boss chết THẬT — tránh false-positive lúc chuyển
+    -- phase (bug boss man báo: đánh "Hải Tặc Đào Hoa" [Cake Prince] qua
+    -- phase 2, Parent/Humanoid tạm biến mất trong animation chuyển phase,
+    -- code cũ tưởng chết → reset nhầm, bỏ dở boss đang đánh dở).
+    -- Giờ: mất dấu / Health<=0 → CHỜ xác nhận liên tục 3 giây, nếu tên đó
+    -- xuất hiện sống lại (phase mới) trong lúc chờ thì huỷ reset, đánh tiếp.
+    -- ============================================================
+    local function ConfirmBossDead(bossName)
+        -- [FIXED - bớt delay theo yêu cầu boss man] 3×1s (3.0s tổng) →
+        -- 6×0.3s (1.8s tổng). KHÔNG rút bằng cách giảm số lần check xuống —
+        -- làm vậy sẽ yếu lại đúng cái bug false-positive từng fix. Thay vào
+        -- đó tăng gấp đôi số lần poll (3→6) trong khi tổng thời gian NGẮN
+        -- hơn 40% — vừa nhanh hơn vừa bắt "sống lại giữa chừng" nhạy hơn.
+        for _ = 1, 6 do
+            task.wait(0.3)
+            local stillThere = ScriptStorage.Enemies[bossName]
+            if stillThere and stillThere:FindFirstChild("Humanoid") and stillThere.Humanoid.Health > 0 then
+                return false -- sống lại (chuyển phase) — KHÔNG phải chết thật
+            end
+        end
+        return true -- 1.8s liên tục không thấy sống lại — chắc chắn chết
+    end
+
+    FunctionsHandler.BossesTask:RegisterMethod("Refresh", function()
+        local k
+        for h, h in BossesOrder do
+            -- [FIXED] Thêm gate Config.BossWeapons — trước đây không có cách
+            -- nào tắt farm 1 boss cụ thể, giờ set Config.BossWeapons[name]=false là bỏ qua
+            if Config.BossWeapons[h] ~= false then
+                local X = BossesOrderLevel[h]
+                if ScriptStorage.PlayerData.Level >= X then
+                    local X = ScriptStorage.Enemies[h]
+                    if X and X:FindFirstChild("Humanoid") and X.Humanoid.Health > 0 then k = X end
+                end
+            end
+        end
+        if k and (CaculateDistance(k.HumanoidRootPart.CFrame) < (SeaIndex == 2 and 3000 or 5000) or BossesOrderWL[tostring(k)] or ScriptStorage.PlayerData.Level == MaxLevel) then
+            return k
+        end
+    end)
+
+    FunctionsHandler.BossesTask:RegisterMethod('Start', function(k)
+        if k then
+            SetTask("MainTask", "Auto Farm Boss - Defeating " .. k.Name)
+            SetTask('SubTask', '👑 Boss: ' .. k.Name .. ' | HP: ' .. math.floor(k.Humanoid.Health / k.Humanoid.MaxHealth * 100) .. '%')
+            CombatController.Attack(tostring(k), null, null, function() SpecialItems = nil end)
+            SpecialItems = nil
+
+            -- [ADDED] "Reset teleport về farm level tiếp" — boss man yêu cầu:
+            -- sau khi hạ xong, reset nhân vật (respawn) để đảm bảo LevelFarm
+            -- tiếp tục sạch sẽ thay vì có thể bị kẹt vị trí/trạng thái combat
+            pcall(function()
+                if k.Parent == nil or (k:FindFirstChild("Humanoid") and k.Humanoid.Health <= 0) then
+                    -- [FIXED] Xác nhận chết thật trước khi reset (tránh false-positive lúc chuyển phase)
+                    if ConfirmBossDead(k.Name) then
+                        SetTask('SubTask', '✅ Đã hạ ' .. k.Name .. ' — reset về farm level')
+                        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            hum.Health = 0
+                            LocalPlayer.CharacterAdded:Wait()
+                        end
+                    else
+                        SetTask('SubTask', k.Name .. ' đang chuyển phase — tiếp tục đánh')
+                    end
+                end
+            end)
+        end
+    end)
+
+    -- ============================================================
+    -- SPECIAL BOSSES TASK
+    -- ============================================================
+    FunctionsHandler.SpecialBossesTask:RegisterMethod('Refresh', function()
+        local k
+        for h, X in SpecialBossesOrder do
+            -- [FIXED] Cùng gate Config.BossWeapons như BossesTask
+            if Config.BossWeapons[h] ~= false and ScriptStorage.PlayerData.Level >= X then
+                local X = ScriptStorage.Enemies[h]
+                if X and X:FindFirstChild('Humanoid') and X.Humanoid.Health > 0 then k = X end
+            end
+        end
+        -- [ADDED] Không thấy boss nào lên → farm Bones nhẹ nhàng ở nền
+        -- (fire-and-forget, KHÔNG return true nên LevelFarm vẫn chạy bình
+        -- thường) — Bones là nguyên liệu Fire Essence (Dragon Talon) VÀ
+        -- theo nat kaitun cũng liên quan tới tỉ lệ Soul Reaper xuất hiện
+        if not k then
+            pcall(function()
+                local bonesCheck = Remotes.CommF_:InvokeServer("Bones", "Check")
+                if bonesCheck and bonesCheck > 0 then
+                    Remotes.CommF_:InvokeServer("Bones", "Buy", 1, 1)
+                end
+            end)
+        end
+        return k
+    end)
+
+    FunctionsHandler.SpecialBossesTask:RegisterMethod('Start', function(k)
+        if FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call() then
+            pcall(function() LocalPlayer.Character.Humanoid.Health = 0 end)
+        end
+        if k then
+            SetTask('MainTask', "Auto Farm Boss - Defeating " .. k.Name)
+            SetTask('SubTask', '👾 Special Boss: ' .. k.Name)
+            CombatController.Attack(tostring(k))
+
+            -- [ADDED] Cùng logic reset như BossesTask — hạ xong Katakuri/
+            -- Core/Darkbeard thì reset về farm level bình thường
+            pcall(function()
+                if k.Parent == nil or (k:FindFirstChild("Humanoid") and k.Humanoid.Health <= 0) then
+                    -- [FIXED] Xác nhận chết thật trước khi reset (tránh false-positive lúc chuyển phase)
+                    if ConfirmBossDead(k.Name) then
+                        SetTask('SubTask', '✅ Đã hạ ' .. k.Name .. ' — reset về farm level')
+                        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            hum.Health = 0
+                            LocalPlayer.CharacterAdded:Wait()
+                        end
+                    else
+                        SetTask('SubTask', k.Name .. ' đang chuyển phase — tiếp tục đánh')
+                    end
+                end
+            end)
+        end
+    end)
+
+    -- ============================================================
+    -- RAID CONTROLLER
+    -- ============================================================
+    -- ============================================================
+    -- [NEW] getInventoryFruits — đọc trực tiếp ItemConfig/FruitInfo,
+    -- không qua remote round-trip, có sẵn Rarity để lọc
+    -- ============================================================
+    local function getInventoryFruits()
+        local fruits = {}
+        local inventory = require(ReplicatedStorage.ItemConfig):GetItems(ReplicatedStorage.ItemConfig.KEYS.QUANTITY)
+        for _, item in pairs(inventory) do
+            if item.Value and item.Value > 0 then
+                local _, data = pcall(function()
+                    return ReplicatedStorage.FruitInfo.List[item.ItemId]
+                end)
+                if data then
+                    local name = data.Display.Name or item.ItemId
+                    local rarity = data.Rarity and data.Rarity.Name or "Unknown"
+                    local value = data.Price or 0
+                    table.insert(fruits, {Name = name, Rarity = rarity, Value = value})
+                end
+            end
+        end
+        return fruits
+    end
+
+    -- [NEW] Chọn trái để bán/dùng mua chip: ưu tiên Common/Uncommon + giá
+    -- thấp nhất; nếu không có trái Common/Uncommon nào thì lấy trái rẻ
+    -- nhất trong kho bất kể rarity
+    local function PickFruitToSpend()
+        local ok, fruits = pcall(getInventoryFruits)
+        if not ok or not fruits or #fruits == 0 then return nil end
+
+        local commonUncommon = {}
+        for _, f in ipairs(fruits) do
+            if f.Rarity == "Common" or f.Rarity == "Uncommon" then
+                table.insert(commonUncommon, f)
+            end
+        end
+
+        local pool = #commonUncommon > 0 and commonUncommon or fruits
+        table.sort(pool, function(a, b) return (a.Value or 0) < (b.Value or 0) end)
+        return pool[1]
+    end
+
+    -- ============================================================
+    -- ============================================================
+    -- [NEW] SWORD BOSS TASK — farm boss lấy sword, 100% verified từ
+    -- file_kaitun_dự_phòng.lua (Configs["Sword"] + CheckBoss + "gi" check)
+    -- Có sẵn check inventory: đã có sword đó rồi thì bỏ qua, không đánh nữa
+    -- ============================================================
+    local SwordBossList = {
+        {sword = "Shark Saw",       boss = "The Saw",              sea = 1, level = 100},
+        {sword = "Wardens Sword",   boss = "Chief Warden",         sea = 1, level = 100},
+        {sword = "Pole (1st Form)", boss = "Thunder God",          sea = 1, level = 100},
+        {sword = "Gravity Blade",   boss = "Orbitus",               sea = 2, level = 800},
+        {sword = "Longsword",       boss = "Diamond",               sea = 2, level = 800},
+        {sword = "Rengoku",         boss = "Awakened Ice Admiral",  sea = 2, level = 800},
+        {sword = "Flail",           boss = "Smoke Admiral",         sea = 2, level = 0},
+        {sword = "Twin Hooks",      boss = "Captain Elephant",      sea = 3, level = 0},
+    }
+    -- Toạ độ dùng Hidden Key / Library Key mở khoá Rengoku (verified)
+    local HIDDEN_KEY_CF  = CFrame.new(6572.29248, 295.712677, -6966.09961)
+    local LIBRARY_KEY_CF = CFrame.new(6377.12549, 296.634735, -6843.76025)
+
+    FunctionsHandler.SwordBossTask:RegisterMethod("Refresh", function()
+        for _, sw in ipairs(SwordBossList) do
+            -- [NEW] Check inventory liên tục — có sword rồi thì bỏ qua
+            -- (đúng yêu cầu boss man: "check inventory ... nếu có ko đánh nữa")
+            if Config.Sword[sw.sword] and not CheckItem(sw.sword)
+                and SeaIndex == sw.sea and (ScriptStorage.PlayerData.Level or 0) >= sw.level then
+                local boss = ScriptStorage.Enemies[sw.boss]
+                if boss and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+                    return sw
+                end
+            end
+        end
+        -- Riêng Rengoku: có thêm 2 đường phụ qua Hidden Key / Library Key
+        -- (không cần boss đang sống, chỉ cần đang cầm chìa + ở Sea 2)
+        if Config.Sword["Rengoku"] and not CheckItem("Rengoku") and SeaIndex == 2 then
+            if CheckItem("Hidden Key") or CheckItem("Library Key") then
+                return {sword = "Rengoku", useKey = true}
+            end
+        end
+        return nil
+    end)
+
+    FunctionsHandler.SwordBossTask:RegisterMethod("Start", function(sw)
+        if not sw then return end
+
+        if sw.useKey then
+            local keyName = CheckItem("Hidden Key") and "Hidden Key" or "Library Key"
+            local cf = keyName == "Hidden Key" and HIDDEN_KEY_CF or LIBRARY_KEY_CF
+            SetTask("MainTask", "Sword Boss | Dùng " .. keyName .. " mở Rengoku")
+            TweenController.Create(cf)
+            if CaculateDistance(cf) <= 5 then
+                FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call(keyName)
+            end
+            return
+        end
+
+        local boss = ScriptStorage.Enemies[sw.boss]
+        if not boss then return end
+
+        SetTask("MainTask", "Sword Boss | Đánh " .. sw.boss .. " lấy " .. sw.sword)
+        if boss:FindFirstChild("HumanoidRootPart") then
+            TweenController.Create(boss.HumanoidRootPart.CFrame + Vector3.new(0, 30, 0))
+        end
+        CombatController.Attack(sw.boss)
+
+        -- [ADDED] Hạ xong → reset về farm level, giống pattern các boss khác
+        pcall(function()
+            if boss.Parent == nil or (boss:FindFirstChild("Humanoid") and boss.Humanoid.Health <= 0) then
+                if ConfirmBossDead(sw.boss) then
+                    SetTask('SubTask', '✅ Đã hạ ' .. sw.boss .. ' — reset về farm level')
+                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.Health = 0
+                        LocalPlayer.CharacterAdded:Wait()
+                    end
+                else
+                    SetTask('SubTask', sw.boss .. ' đang chuyển phase — tiếp tục đánh')
+                end
+            end
+        end)
+    end)
+
+
+    -- Cake Prince [Lv. 2300] [Raid Boss] (Sea 3, đảo CakeLoaf)
+    -- [FIXED - theo spec mới] TRƯỚC ĐÂY dùng để farm Fragment (gate bởi
+    -- Fragments > 5000) — spec mới yêu cầu XOÁ HẲN mục đích đó, "chỉ dùng
+    -- raid để lấy Fragment". Cake Prince giờ CHỈ dùng để farm MASTERY cho
+    -- melee đang tập (V1 cần 500, V2 cần 400) — giết Cake Prince với vũ
+    -- khí đang tập cho mastery tăng nhanh hơn quái thường.
+    -- ============================================================
+    local CAKE_AREA_CF   = CFrame.new(-2077, 252, -12373)        -- đảo CakeLoaf nói chung
+    local CAKE_BOSS_CF   = CFrame.new(-2151.82, 149.32, -12404.91) -- chỗ Cake Prince xuất hiện
+    local CAKE_UNLOCK_MOBS = {"Cookie Crafter", "Cake Guard", "Baking Staff", "Head Baker"}
+
+    -- [NEW] Xác định melee nào đang cần train mastery — dùng chung giữa
+    -- CakePrinceTask và MeleesController để đồng bộ (train đúng cái đang
+    -- thiếu, theo đúng thứ tự V1 → V2 spec yêu cầu)
+    local MASTERY_TRAIN_ORDER = {
+        {name = "Black Leg",       target = 500, tier = "V1"},
+        {name = "Electro",         target = 500, tier = "V1"},
+        {name = "Fishman Karate",  target = 500, tier = "V1"},
+        {name = "Dragon Claw",     target = 500, tier = "V1"},
+        {name = "Superhuman",      target = 500, tier = "V1"},
+        {name = "Death Step",      target = 400, tier = "V2"},
+        {name = "Sharkman Karate", target = 400, tier = "V2"},
+        {name = "Electric Claw",   target = 400, tier = "V2"},
+        {name = "Dragon Talon",    target = 400, tier = "V2"},
+    }
+
+    function GetCurrentTrainingMelee()
+        for _, m in ipairs(MASTERY_TRAIN_ORDER) do
+            if CheckItem(m.name) then
+                local mastery = ScriptStorage.Melees[m.name] or 0
+                if mastery < m.target then
+                    return m.name, mastery, m.target
+                end
+            end
+        end
+        return nil
+    end
+
+    FunctionsHandler.CakePrinceTask:RegisterMethod("Refresh", function()
+        if SeaIndex ~= 3 then return nil end
+        if (ScriptStorage.PlayerData.Level or 0) < 1500 then return nil end
+        -- [FIXED] Gate bằng "có melee nào đang cần train mastery không",
+        -- KHÔNG còn gate bằng Fragments nữa
+        local trainingName = GetCurrentTrainingMelee()
+        if not trainingName then return nil end
+        return trainingName
+    end)
+
+    FunctionsHandler.CakePrinceTask:RegisterMethod("Start", function(trainingName)
+        if not trainingName then return end
+        local mastery, target = ScriptStorage.Melees[trainingName] or 0, nil
+        for _, m in ipairs(MASTERY_TRAIN_ORDER) do
+            if m.name == trainingName then target = m.target break end
+        end
+
+        -- [NEW] Check mastery mỗi vòng — đạt ngưỡng thì dừng farm, để
+        -- Refresh() vòng sau tự chuyển qua melee tiếp theo cần train
+        if mastery >= (target or 500) then
+            SetTask("SubTask", "✅ " .. trainingName .. " đạt " .. mastery .. " mastery — chuyển melee tiếp theo")
+            return
+        end
+
+        -- [NEW] Trang bị đúng melee đang cần train trước khi đánh, để
+        -- damage tính mastery cho ĐÚNG vũ khí
+        pcall(function()
+            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call(trainingName)
+        end)
+
+        local cakeLoaf  = workspace.Map:FindFirstChild("CakeLoaf")
+        local bigMirror = cakeLoaf and cakeLoaf:FindFirstChild("BigMirror")
+        local enemies   = workspace.Enemies
+
+        -- Chưa tới đảo Cake → tp tới trước
+        if not cakeLoaf then
+            SetTask("MainTask", "Cake Mastery | " .. trainingName .. " (" .. mastery .. "/" .. (target or 500) .. ") — di chuyển tới đảo Cake")
+            TweenController.Create(CAKE_AREA_CF)
+            return
+        end
+
+        local mirrorOpen = bigMirror and bigMirror:FindFirstChild("Other") and bigMirror.Other.Transparency == 0
+        local bossUp     = enemies:FindFirstChild("Cake Prince")
+
+        if mirrorOpen or bossUp then
+            -- Gương đã mở HOẶC boss đã lên → đánh (mastery tăng nhanh)
+            local boss = enemies:FindFirstChild("Cake Prince")
+            if boss and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+                SetTask("MainTask", "Cake Mastery | " .. trainingName .. " (" .. mastery .. "/" .. (target or 500) .. ") | Cake Prince HP " .. math.floor(boss.Humanoid.Health / boss.Humanoid.MaxHealth * 100) .. "%")
+                TweenController.Create(boss.HumanoidRootPart.CFrame + Vector3.new(0, 30, 0))
+                CombatController.Attack("Cake Prince")
+
+                -- [ADDED] Hạ xong → reset về farm bình thường, giống pattern
+                -- BossesTask/SpecialBossesTask đã làm trước đó
+                pcall(function()
+                    if boss.Parent == nil or boss.Humanoid.Health <= 0 then
+                        -- [FIXED] Đây chính xác là case boss man báo — Cake Prince
+                        -- ("Hải Tặc Đào Hoa") chuyển phase 2, code cũ tưởng chết
+                        if ConfirmBossDead("Cake Prince") then
+                            SetTask('SubTask', '✅ Đã hạ Cake Prince — reset về farm level')
+                            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                            if hum then
+                                hum.Health = 0
+                                LocalPlayer.CharacterAdded:Wait()
+                            end
+                        else
+                            SetTask('SubTask', 'Cake Prince đang chuyển phase — tiếp tục đánh')
+                        end
+                    end
+                end)
+            else
+                TweenController.Create(CAKE_BOSS_CF)
+            end
+            return
+        end
+
+        -- Gương chưa mở, boss chưa lên → farm quái thường lấy mastery +
+        -- check tiến độ mở khoá (đủ thì tự trigger spawn Cake Prince)
+        SetTask("MainTask", "Cake Mastery | " .. trainingName .. " (" .. mastery .. "/" .. (target or 500) .. ") — farm quái thường")
+        local killedStr = Remotes.CommF_:InvokeServer("CakePrinceSpawner")
+        local killed = killedStr and tonumber(tostring(killedStr):match("%d+")) or 0
+        local remaining = math.max(0, 500 - killed)
+
+        if remaining <= 0 then
+            SetTask("MainTask", "Cake Mastery | Đủ điều kiện — đang triệu hồi Cake Prince")
+            Remotes.CommF_:InvokeServer("CakePrinceSpawner", true)
+            task.wait(1)
+            return
+        end
+
+        -- Chưa đủ → farm quái mở khoá
+        SetTask("MainTask", "Cake Prince | Farm quái mở khoá — còn " .. remaining .. "/500")
+        local mob = nil
+        for _, mobName in ipairs(CAKE_UNLOCK_MOBS) do
+            local m = enemies:FindFirstChild(mobName)
+            if m and m:FindFirstChild("Humanoid") and m.Humanoid.Health > 0 then mob = m break end
+        end
+        if mob then
+            TweenController.Create(mob.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0))
+            CombatController.Attack(CAKE_UNLOCK_MOBS)
+        else
+            TweenController.Create(CAKE_AREA_CF)
+        end
+    end)
+
+
+    FunctionsHandler.RaidController:RegisterMethod("RefreshRaidType", function()
+        for k, k in require(game.ReplicatedStorage.Raids).raids do
+            if string.find(ScriptStorage.PlayerData.DevilFruit, k) then
+                FunctionsHandler.RaidController:Set('CurrentChip', k)
+                return
+            end
+        end
+        FunctionsHandler.RaidController:Set('CurrentChip', 'Flame')
+    end)
+
+    FunctionsHandler.RaidController:RegisterMethod('GetRaidableFruit', function()
+        -- [FIXED] Trước đây lấy trái ĐẦU TIÊN tìm thấy dưới 1tr Beli, không
+        -- quan tâm rarity — dễ lỡ tay bán nhầm trái đắt/hiếm nếu nó đứng
+        -- trước trong Backpack. Giờ dùng PickFruitToSpend(): ưu tiên
+        -- Common/Uncommon + rẻ nhất, fallback rẻ nhất toàn kho nếu không có.
+        local picked = PickFruitToSpend()
+        if picked then
+            for k, k in ScriptStorage.Backpack do
+                if k.Name == picked.Name then return k end
+            end
+        end
+        -- fallback về logic cũ nếu getInventoryFruits() lỗi vì lý do gì đó
+        for k, k in ScriptStorage.Backpack do
+            if string.find(FruitIdToName(k.Name), " Fruit") then
+                if k.Value and k.Value < 1000000 then return k end
+            end
+        end
+    end)
+
+    FunctionsHandler.RaidController:RegisterMethod("GetCurrentRaidIsland", function()
+        local IslandsList = {{}, {}, {}, {}, {}}
+        for k, k in workspace['_WorldOrigin'].Locations:GetChildren() do
+            if string.find(k.Name, 'Island ') and CaculateDistance(k.Position, Vector3.new(0, 0, 0)) > 7000 then
+                local h = string.gsub(k.Name, "Island ", "")
+                local X = tonumber(h)
+                table.insert(IslandsList[X], k)
+            end
+        end
+        for k = 5, 1, -1 do
+            for h, h in IslandsList[k] do if CaculateDistance(h.Position) < 2000 then return h end end
+        end
+        return nil
+    end)
+
+    function CheckSpecialMicrochip()
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        for _, h in {LocalPlayer.Character:GetChildren(), bp and bp:GetChildren() or {}} do
+            for _, X in h do if X.Name == "Special Microchip" then return X end end
+        end
+        return nil
+    end
+
+    FunctionsHandler.RaidController:RegisterMethod("Refresh", function()
+        local lv = ScriptStorage.PlayerData.Level or 0
+        if lv < 1300 then return nil end
+        if CheckSpecialMicrochip() then return nil end
+        local fr = ScriptStorage.PlayerData.Fragments or 0
+        if lv < 1500 and fr > 2000 then return nil end
+        if lv < MaxLevel and fr > 5000 then return nil end
+        if lv >= MaxLevel and fr > 10000 then return nil end
+        local fruit = FunctionsHandler.RaidController.Methods.GetRaidableFruit:Call()
+        if fruit then FunctionsHandler.RaidController:Set("CurrentProgressLevel", fruit) end
+        return fruit or FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call() or CheckSpecialMicrochip()
+    end)
+
+    FunctionsHandler.RaidController:RegisterMethod("Start", function()
+        if not FunctionsHandler.RaidController:Get('CurrentChip') then FunctionsHandler.RaidController.Methods.RefreshRaidType:Call() end
+        local k = FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call()
+        RefreshInventory()
+        FunctionsHandler.RaidController:Set("CurrentProgressLevel", nil)
+        if not k then
+            SetTask('MainTask', 'Auto Raid - Buying Chip - ' .. FunctionsHandler.RaidController:Get("CurrentChip"))
+            if not ScriptStorage.Tools['Special Microchip'] then
+                local h = FunctionsHandler.RaidController.Methods.GetRaidableFruit:Call()
+                table.insert(ScriptStorage.IgnoreStoreFruits, h.Name)
+                alert('Load Fruit', h.Name)
+                Remotes.CommF_:InvokeServer('LoadFruit', h.Name)
+                Remotes.CommF_:InvokeServer("RaidsNpc", 'Select', FunctionsHandler.RaidController:Get('CurrentChip'))
+                task.wait(2)
+            end
+            local h = ({nil, 'Circle Island', "Boat Castle"})[SeaIndex]
+            if not ScriptStorage.Map[h] and not ScriptStorage.Map[h] then
+                task.wait(1)
+                game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", game.JobId)
+            end
+            if not ScriptStorage.Map[h]:FindFirstChild('RaidSummon2') then
+                task.wait(1)
+                TweenController.Create(ScriptStorage.Map[h]:GetModelCFrame() or ScriptStorage.Map[h]:GetModelCFrame())
+            end
+            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call('Special Microchip')
+            fireclickdetector((ScriptStorage.Map[h] or workspace.Map:FindFirstChild(h) or workspace:FindFirstChild(h)).RaidSummon2.Button.Main.ClickDetector)
+            local h = os.time()
+            SetTask("MainTask", "Auto Raid - Waiting Until Raid Is Started")
+            repeat task.wait() until os.time() - (LastRaidAlert2 or 0) < 20 or os.time() - h > 30
+            TweenController.Create(LocalPlayer.Character.HumanoidRootPart.CFrame)
+            repeat task.wait() until os.time() - (LastRaidAlert or 0) < 20 or os.time() - h > 30
+            alert('cac', "Tween Paused")
+            task.wait(.5)
+            if os.time() - h > 30 then
+                game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", game.JobId)
+                SetTask('MainTask', "Auto Raid - Raid Is Not Stared?")
+                Report('[ Raid Error ] Time Limit Reached')
+            end
+            LastRaidAlert = 0
+        else
+            SetTask('MainTask', "Auto Raid - " .. k.Name .. " /5")
+            SetTask('SubTask', 'Raid Island ' .. k.Name .. ' | Clearing wave...')
+            local islandNum = tonumber(string.match(k.Name, "(%d+)"))
+            if islandNum and islandNum >= 4 then
+                TweenController.Create(k.Position + Vector3.new(0, 50, 0))
+                task.wait(0.5)
+                for _, v in workspace.Enemies:GetChildren() do
+                    pcall(function()
+                        if v:FindFirstChild("Humanoid") then v.Humanoid.Health = 0 end
+                        if v:FindFirstChild("HumanoidRootPart") then v.HumanoidRootPart.CanCollide = false end
+                        v:BreakJoints()
+                    end)
+                end
+            else
+                local h = false
+                for X, X in GetMonAsSortedRange() do
+                    local w = os.time()
+                    while X and X:FindFirstChild("HumanoidRootPart") and X.Humanoid.Health > 0 and CaculateDistance(X.HumanoidRootPart.Position) < 1000 and os.time() - w < 60 and task.wait(.05) do
+                        h = true
+                        if string.find(X.Name, "Master") or true then
+                            CombatController.Attack(X.Name)
+                        else
+                            pcall(sethiddenproperty, LocalPlayer, 'SimulationRadius', math.huge)
+                            pcall(function()
+                                X.HumanoidRootPart.CanCollide = false
+                                X.Humanoid.Health = 0
+                                X:BreakJoints()
+                            end)
+                        end
+                    end
+                end
+                if not h then TweenController.Create(k.Position + Vector3.new(0, 100, 0)) end
+            end
+        end
+    end)
+
+    -- ============================================================
+    -- AUTO RAID ICE
+    -- ============================================================
+    local RAID_ICE_CHIP_COOLDOWN = 2 * 60 * 60
+
+    -- [NEW] 2 helper lấy từ Moonlight_New_Public_source.lua (chỉ lấy LOGIC,
+    -- bỏ hết toggle/UI của nó) — dùng để làm AutoRaidIce đáng tin cậy hơn:
+    -- 1. TriggerInteractive: bấm nút raid summon bằng CẢ ProximityPrompt
+    --    LẪN ClickDetector (tìm đệ quy) — code cũ chỉ cứng path ClickDetector
+    --    1 chỗ, nếu game đổi qua ProximityPrompt thì "Khong tim thay button"
+    --    dù nút vẫn ở đó.
+    -- 2. RaidTimerActive: check trực tiếp PlayerGui.Main.TopHUDList.RaidTimer
+    --    .Visible — biết NGAY raid đã bắt đầu hay chưa, không cần đợi
+    --    notification 'go!'/'raid' bắn ra (vẫn giữ 2 cái đó làm dự phòng).
+    local function TriggerInteractive(object)
+        if not object then return false end
+        local prompt = object:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt and typeof(fireproximityprompt) == "function" then
+            local ok = pcall(fireproximityprompt, prompt)
+            if ok then return true end
+        end
+        local click = object:FindFirstChildWhichIsA("ClickDetector", true)
+        if click and typeof(fireclickdetector) == "function" then
+            local ok = pcall(fireclickdetector, click)
+            if ok then return true end
+        end
+        return false
+    end
+
+    local function RaidTimerActive()
+        local ok, result = pcall(function()
+            local gui  = LocalPlayer:FindFirstChild("PlayerGui")
+            local main = gui and gui:FindFirstChild("Main")
+            local top  = main and main:FindFirstChild("TopHUDList")
+            local timer = top and top:FindFirstChild("RaidTimer")
+            return timer and timer.Visible or false
+        end)
+        return ok and result or false
+    end
+
+
+    FunctionsHandler.AutoRaidIce:RegisterMethod("GetCheapestFruit", function(maxPrice)
+        maxPrice = maxPrice or 1000000
+        local ok1, fruitPrices = pcall(function() return Remotes.CommF_:InvokeServer("GetFruits") end)
+        local ok2, inventoryFruits = pcall(function() return Remotes.CommF_:InvokeServer("getInventoryFruits") end)
+        if not ok1 or not ok2 then return nil end
+        local priceMap = {}
+        for _, v in pairs(fruitPrices) do
+            if v.Price and v.Price <= maxPrice then
+                priceMap[v.Name] = v.Price
+            end
+        end
+        local cheapest, lowestPrice = nil, math.huge
+        for _, fruitData in pairs(inventoryFruits) do
+            local name = fruitData.Name
+            if name and priceMap[name] and priceMap[name] < lowestPrice then
+                lowestPrice = priceMap[name]
+                cheapest = name
+            end
+        end
+        return cheapest, lowestPrice
+    end)
+
+    FunctionsHandler.AutoRaidIce:RegisterMethod("KillAura", function()
+        local currentIsland = FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call()
+        pcall(sethiddenproperty, LocalPlayer, 'SimulationRadius', math.huge)
+        for _, v in pairs(workspace.Enemies:GetChildren()) do
+            pcall(function()
+                if currentIsland then
+                    local dist = CaculateDistance(v.HumanoidRootPart.Position, currentIsland.Position)
+                    if dist > 1500 then return end
+                end
+                if v:FindFirstChild("Humanoid") then v.Humanoid.Health = 0 end
+                if v:FindFirstChild("HumanoidRootPart") then v.HumanoidRootPart.CanCollide = false end
+                v:BreakJoints()
+            end)
+        end
+    end)
+
+    FunctionsHandler.AutoRaidIce:RegisterMethod("BuyChip", function()
+        local lastBuy = Storage:Get("RaidIceLastChipBuy") or 0
+        if os.time() - lastBuy < RAID_ICE_CHIP_COOLDOWN then return false end
+        local fruitName = FunctionsHandler.AutoRaidIce.Methods.GetCheapestFruit:Call(1000000)
+        if fruitName then
+            SetTask('MainTask', 'Auto Raid Ice | Mua chip bang trai ' .. fruitName)
+            table.insert(ScriptStorage.IgnoreStoreFruits, fruitName)
+            Remotes.CommF_:InvokeServer('LoadFruit', fruitName)
+            task.wait(0.5)
+            Remotes.CommF_:InvokeServer("RaidsNpc", "Select", "Ice")
+            task.wait(1)
+            RefreshInventory()
+            if CheckSpecialMicrochip() then
+                Storage:Set("RaidIceLastChipBuy", os.time())
+                Storage:Save()
+                return true
+            else
+                for i = 1, 2 do
+                    task.wait(2)
+                    Remotes.CommF_:InvokeServer("RaidsNpc", "Select", "Ice")
+                    task.wait(1)
+                    RefreshInventory()
+                    if CheckSpecialMicrochip() then
+                        Storage:Set("RaidIceLastChipBuy", os.time())
+                        Storage:Save()
+                        return true
+                    end
+                end
+                SetTask('MainTask', 'Auto Raid Ice | Mua chip that bai')
+                return false
+            end
+        elseif (ScriptStorage.PlayerData.Beli or 0) >= 100000 then
+            SetTask('MainTask', 'Auto Raid Ice | Mua chip bang Beli')
+            Remotes.CommF_:InvokeServer("RaidsNpc", "Select", "Ice")
+            task.wait(1)
+            RefreshInventory()
+            if CheckSpecialMicrochip() then
+                Storage:Set("RaidIceLastChipBuy", os.time())
+                Storage:Save()
+                return true
+            end
+            return false
+        end
+        SetTask('MainTask', 'Auto Raid Ice | Khong du tai nguyen mua chip')
+        return false
+    end)
+
+    FunctionsHandler.AutoRaidIce:RegisterMethod("Refresh", function()
+        local lv = ScriptStorage.PlayerData.Level or 0
+        local fr = ScriptStorage.PlayerData.Fragments or 0
+        local target = Config.AutoRaidIce_TargetFragments or 5000
+        if lv < 1300 then return nil end
+        if fr >= target then
+            SetTask('MainTask', 'Raid Ice | Da dat target: ' .. fr .. '/' .. target)
+            return nil
+        end
+        local hasChip = CheckSpecialMicrochip() ~= nil
+        local onRaid = FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call()
+        if onRaid then return true end
+        if hasChip then return true end
+        local lastBuy = Storage:Get("RaidIceLastChipBuy") or 0
+        if os.time() - lastBuy >= RAID_ICE_CHIP_COOLDOWN then return true end
+        return nil
+    end)
+
+    FunctionsHandler.AutoRaidIce:RegisterMethod("Start", function()
+        local currentIsland = FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call()
+        local target = Config.AutoRaidIce_TargetFragments or 5000
+        local fr = ScriptStorage.PlayerData.Fragments or 0
+        if fr >= target then
+            SetTask('MainTask', 'Raid Ice | Da dat target fragments')
+            return
+        end
+        if currentIsland then
+            local islandNum = tonumber(string.match(currentIsland.Name, "(%d+)"))
+            SetTask('MainTask', 'Raid Ice | Fragments: ' .. fr .. '/' .. target .. ' | Dao ' .. (islandNum or "?") .. '/5')
+            SetTask('SubTask', 'Raid Ice | Clearing island ' .. (islandNum or "?"))
+            if islandNum and islandNum >= 3 then
+                SetTask('MainTask', 'Raid Ice | Dao ' .. islandNum .. ' | Kill Aura')
+                FunctionsHandler.AutoRaidIce.Methods.KillAura:Call()
+                TweenController.Create(currentIsland.Position + Vector3.new(0, 50, 0))
+                task.wait(1)
+            else
+                local hasEnemy = false
+                for _, v in GetMonAsSortedRange() do
+                    if CaculateDistance(v.HumanoidRootPart.Position) < 1500 then
+                        hasEnemy = true
+                        CombatController.Attack(v.Name)
+                        break
+                    end
+                end
+                if not hasEnemy then
+                    TweenController.Create(currentIsland.Position + Vector3.new(0, 100, 0))
+                end
+            end
+            return
+        end
+        if not CheckSpecialMicrochip() then
+            local bought = FunctionsHandler.AutoRaidIce.Methods.BuyChip:Call()
+            if not bought then return end
+            task.wait(2)
+            RefreshInventory()
+        end
+        if not CheckSpecialMicrochip() then return end
+        local mapName = ({nil, 'Circle Island', 'Boat Castle'})[SeaIndex]
+        if not mapName then return end
+        local mapObj = ScriptStorage.Map[mapName]
+        if not mapObj then
+            Report('[AutoRaidIce] Khong tim thay Map: ' .. mapName)
+            return
+        end
+        local summonCFrame
+        if SeaIndex == 2 then summonCFrame = CFrame.new(-6438.73, 250.64, -4501.50)
+        elseif SeaIndex == 3 then summonCFrame = CFrame.new(-5097.93, 316.44, -3142.66) end
+        if summonCFrame then
+            SetTask('MainTask', 'Raid Ice | Di den summon button')
+            TweenController.Create(summonCFrame)
+            local t0 = tick()
+            repeat task.wait(0.3) until CaculateDistance(summonCFrame) < 25 or tick()-t0 > 20
+        end
+        if not mapObj:FindFirstChild('RaidSummon2') then
+            TweenController.Create(mapObj:GetModelCFrame())
+            task.wait(1)
+            return
+        end
+        FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call('Special Microchip')
+        local btn = (mapObj or workspace.Map:FindFirstChild(mapName) or workspace:FindFirstChild(mapName))
+        local summonObj = btn and btn:FindFirstChild("RaidSummon2")
+        local clickSuccess = false
+        for retry = 1, 3 do
+            if retry > 1 then task.wait(3) end
+            pcall(function()
+                -- [FIXED] Dùng TriggerInteractive thay vì chỉ fireclickdetector
+                -- cứng 1 path — bắt được cả ProximityPrompt lẫn ClickDetector
+                if summonObj and TriggerInteractive(summonObj) then
+                    clickSuccess = true
+                    SetTask('MainTask', 'Raid Ice | Da click start (lan ' .. retry .. ')')
+                else
+                    SetTask('MainTask', 'Raid Ice | Khong tim thay button (lan ' .. retry .. ')')
+                end
+            end)
+            if clickSuccess then break end
+        end
+        if not clickSuccess then
+            SetTask('MainTask', 'Raid Ice | Khong the click start')
+            return
+        end
+        SetTask('MainTask', 'Raid Ice | Cho raid bat dau...')
+        local raidStarted = false
+        for attempt = 1, 3 do
+            if attempt > 1 then
+                SetTask('MainTask', 'Raid Ice | Thu lai lan ' .. attempt)
+                pcall(function()
+                    if summonObj then TriggerInteractive(summonObj) end
+                end)
+            end
+            local h = os.time()
+            repeat task.wait(0.5) until
+                RaidTimerActive() or
+                os.time() - (LastRaidAlert2 or 0) < 20 or
+                os.time() - (LastRaidAlert or 0) < 20 or
+                os.time() - h > 35
+            if os.time() - h <= 35 then
+                raidStarted = true
+                break
+            end
+        end
+        if raidStarted then
+            LastRaidAlert = 0
+            SetTask('MainTask', 'Raid Ice | Raid bat dau!')
+        else
+            Report('[AutoRaidIce] Raid khong bat dau')
+            SetTask('MainTask', 'Raid Ice | Raid khong bat dau, thu lai sau...')
+        end
+    end)
+
+    -- ============================================================
+    -- COLLECT DROPS
+    -- ============================================================
+    FunctionsHandler.CollectDrops:RegisterMethod("Refresh", function()
+        local k = {}
+        for h in ScriptStorage.Backpack do k[FruitIdToName(h)] = h end
+        for h, h in workspace:GetChildren() do
+            if string.find(h.Name, 'Fruit') and not a:FindFirstChild(h.Name) and h:FindFirstChild("Handle") and not k[tostring(h)] and not ScriptStorage.Backpack[FruitNameToId(tostring(h))] then
+                FunctionsHandler.CollectDrops:Set('CurrentProgressLevel', h)
+                return h
+            end
+        end
+    end)
+
+    FunctionsHandler.CollectDrops:RegisterMethod('Start', function()
+        local k = FunctionsHandler.CollectDrops:Get('CurrentProgressLevel')
+        FunctionsHandler.CollectDrops:Set('CurrentProgressLevel', nil)
+        if k then
+            SetTask('SubTask', '📦 Collecting: ' .. tostring(k))
+            SetTask("MainTask", "Auto Collect Drop Items - " .. tostring(k))
+            TweenController.Create(k:GetModelCFrame())
+        end
+    end)
+
+    -- ============================================================
+    -- UTILLY ITEMS ACTIVATION
+    -- ============================================================
+    FunctionsHandler.UtillyItemsActivitation:RegisterMethod('Refresh', function()
+        if os.time() - timeee < 20 then return end
+        if not SpecialItems then
+            SpecialItems = {}
+            local k = {}
+            IceAdmiralPassed = true
+            if not ScriptStorage.Backpack.Rengoku then
+                table.insert(SpecialItems, "Hidden Key")
+                IceAdmiralPassed = false
+            end
+            if SeaIndex == 2 and Services.Workspace.Map.IceCastle.Hall.LibraryDoor:FindFirstChild("PhoeyuDoor") then
+                table.insert(SpecialItems, 'Library Key')
+                IceAdmiralPassed = false
+            end
+            if IceAdmiralPassed then table.insert(k, 'Awakened Ice Admiral') end
+            local h = not ScriptStorage.Melees['Sharkman Karate'] and Remotes.CommF_:InvokeServer("BuySharkmanKarate", true)
+            SharkmanPassed = typeof(h) == 'string'
+            if typeof(h) == "string" then
+                table.insert(SpecialItems, 'Water Key')
+            else
+                TidePassed = true
+                table.insert(k, 'Tide Keeper')
+            end
+            if ScriptStorage.Backpack.Yama then
+                table.insert(k, "Deandre")
+                table.insert(k, 'Urban')
+                table.insert(k, 'Diablo')
+            end
+            local function h()
+                local X = {}
+                for w, w in BossesOrder do
+                    local D = true
+                    for y, y in k do if y == w then D = false end end
+                    if D then table.insert(X, w) end
+                end
+                local k = #X
+                for w = 1, k - 1 do
+                    for D = 1, k - w do
+                        local k = key and tostring(X[D][key]):lower() or tostring(X[D]):lower()
+                        local w = key and tostring(X[D + 1][key]):lower() or tostring(X[D + 1]):lower()
+                        if k > w then X[D], X[D + 1] = X[D + 1], X[D] end
+                    end
+                end
+                return X
+            end
+            BossesOrder = h()
+            for k, h in DropItemData do
+                if not ScriptStorage.Backpack[k] and SeaIndex == h.Sea then
+                    if ScriptStorage.PlayerData.Level >= h.Level then
+                        BossesOrderLevel[h.Boss] = h.Level
+                        table.insert(BossesOrder, h.Boss)
+                    end
+                end
+            end
+            if FunctionsHandler.Trevor:Get("IsCompleted") and not Storage:Get('SwanDefeated') then
+                BossesOrderLevel["Don Swan"] = 1100
+                table.insert(BossesOrder, 'Don Swan')
+                if SeaIndex == 2 and ScriptStorage.PlayerData.Level > 1500 and not ScriptStorage.Enemies['Don Swan'] then
+                    alert("Don Swan", 'Hopping for Don Swan')
+                    Hop()
+                end
+            end
+        end
+        for k, k in SpecialItems do
+            if ScriptStorage.Tools[k] then
+                FunctionsHandler.UtillyItemsActivitation:Set('CurrentProgressLevel', k)
+                return k
+            end
+        end
+        if SeaIndex == 3 and (ScriptStorage.Melees["Death Step"] or 0) >= 400 and (ScriptStorage.Melees["Black Leg"] or 0) >= 400 and ScriptStorage.PlayerData.Beli >= 2500000 and ScriptStorage.PlayerData.Fragments >= 5000 and not ScriptStorage.Melees['Electric Claw'] then
+            FunctionsHandler.UtillyItemsActivitation:Set('CurrentProgressLevel', "Previous Hero")
+            return 'Previous Hero'
+        end
+        if ScriptStorage.Tools["Red Key"] then
+            FunctionsHandler.UtillyItemsActivitation:Set("CurrentProgressLevel", "Red Key")
+            return 'Red Key'
+        end
+        if ScriptStorage.Tools['Hallow Essence'] then
+            FunctionsHandler.UtillyItemsActivitation:Set("CurrentProgressLevel", 'Soul Reaper Spawner')
+            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call("Fire Essence")
+            return "Soul Reaper Spawner"
+        end
+        if ScriptStorage.Tools['Fire Essence'] then
+            FunctionsHandler.UtillyItemsActivitation:Set('CurrentProgressLevel', "Uzoth")
+            return 'Uzoth'
+        end
+    end)
+
+    FunctionsHandler.UtillyItemsActivitation:RegisterMethod('Start', function()
+        local k = FunctionsHandler.UtillyItemsActivitation:Get("CurrentProgressLevel")
+        if k == 'Hidden Key' then
+            SetTask('SubTask', '🔑 Using Hidden Key for Rengoku')
+            Remotes.CommF_:InvokeServer("OpenRengoku")
+        elseif k == 'Water Key' then
+            SetTask('SubTask', '🔑 Using Water Key for Sharkman Karate')
+            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call("Water Key")
+            Remotes.CommF_:InvokeServer("BuySharkmanKarate", true)
+            Remotes.CommF_:InvokeServer("BuySharkmanKarate")
+        elseif k == "Library Key" then
+            SetTask('SubTask', '🔑 Using Library Key')
+            Remotes.CommF_:InvokeServer("OpenLibrary")
+            Services.Workspace.Map.IceCastle.Hall.LibraryDoor:FindFirstChild("PhoeyuDoor"):Destroy()
+        elseif k == "Red Key" then
+            SetTask('SubTask', '🔑 Submitting Red Key to scientist')
+            alert('Red Key', "Submitting red key to the scienctist.")
+            Remotes.CommF_:InvokeServer('CakeScientist', "Check")
+            ScriptStorage.Tools["Red Key"]:Destroy()
+        elseif k == 'Previous Hero' then
+            SetTask('SubTask', '⚡ Buying Electric Claw from Previous Hero')
+            Remotes.CommF_:InvokeServer('BuyElectricClaw', "Start")
+            task.wait(3)
+            repeat
+                task.wait()
+                TweenController.Create(CFrame.new(-12548.0, 332.378 + math.random(-2.0, 2), -7617.0))
+            until CaculateDistance(CFrame.new(-12548.0, 332.378, -7617.0)) < 30
+            Data = MeleePrices["Electric Claw"]
+            Data.Buy(1)
+            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call('Melee')
+        elseif k == "Uzoth" then
+            SetTask('SubTask', '🔥 Using Fire Essence for Dragon Talon')
+            print('Use Fire Essence')
+            Remotes.CommF_:InvokeServer("BuyDragonTalon", true)
+            Remotes.CommF_:InvokeServer('BuyDragonTalon')
+            IsFireEssenceGave = true
+            Report("Fire Essence Used")
+        elseif k == "Soul Reaper Spawner" then
+            SetTask('SubTask', '💀 Using Hallow Essence to spawn Soul Reaper')
+            print("Use Hallow Essence")
+            if CaculateDistance(workspace.Map["Haunted Castle"].Summoner.Detection.CFrame) < 100 then SpecialItems = nil end
+            TweenController.Create(workspace.Map["Haunted Castle"].Summoner.Detection.CFrame)
+        end
+    end)
+
+    -- ============================================================
+    -- TREVOR
+    -- ============================================================
+    FunctionsHandler.Trevor:RegisterMethod('GetFruit', function()
+        for k, k in ScriptStorage.Backpack do
+            if string.find(FruitIdToName(k.Name), " Fruit") then
+                if k.Value and k.Value > 1000000 and k.Value < 2500000 then return k end
+            end
+        end
+    end)
+
+    FunctionsHandler.Trevor:RegisterMethod('Refresh', function()
+        if FunctionsHandler.Trevor:Get('IsCompleted') or os.time() - timeee < 1 then return end
+        if ScriptStorage.PlayerData.Level < 1100 then return end
+        local k = FunctionsHandler.Trevor.Methods.GetFruit:Call()
+        if k then FunctionsHandler.Trevor:Set('Fruit', k) end
+        TrevorDebounce = os.time()
+        if not FunctionsHandler.Trevor:Get('IsCompleted') then
+            FunctionsHandler.Trevor:Set('IsCompleted', (Remotes.CommF_:InvokeServer("TalkTrevor", "1") == 0))
+        end
+        return not FunctionsHandler.Trevor:Get("IsCompleted") and k
+    end)
+
+    FunctionsHandler.Trevor:RegisterMethod("Start", function()
+        alert('[ cac ]', "Pulling fruit for trevor...")
+        local k = FunctionsHandler.Trevor:Get("Fruit")
+        FunctionsHandler.Trevor:Set('Fruit', nil)
+        table.insert(ScriptStorage.IgnoreStoreFruits, k.Name)
+        Remotes.CommF_:InvokeServer('LoadFruit', k.Name)
+        task.wait()
+        FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call(FruitIdToName(k.Name))
+        Remotes.CommF_:InvokeServer('TalkTrevor', '1')
+        Remotes.CommF_:InvokeServer('TalkTrevor', "2")
+        Remotes.CommF_:InvokeServer("TalkTrevor", "3")
+        task.wait(1)
+        FunctionsHandler.Trevor:Set('IsCompleted', true)
+    end)
+
+    -- ============================================================
+    -- THIRD SEA PUZZLE (ZOU)
+    -- ============================================================
+    FunctionsHandler.ThirdSeaPuzzle:RegisterMethod("Refresh", function()
+        if ScriptStorage.PlayerData.Level < 1500 or SeaIndex ~= 2 then return end
+        if nil == FunctionsHandler.ThirdSeaPuzzle:Get('State') then
+            ZQuestProgress = Remotes.CommF_:InvokeServer("ZQuestProgress", 'Check')
+            print('ZQuestProgress', ZQuestProgress)
+            FunctionsHandler.ThirdSeaPuzzle:Set("State", ZQuestProgress == 0)
+        end
+        return FunctionsHandler.ThirdSeaPuzzle:Get('State')
+    end)
+
+    FunctionsHandler.ThirdSeaPuzzle:RegisterMethod('Start', function()
+        local k = FunctionsHandler.ThirdSeaPuzzle:Get("State")
+        SetTask('SubTask', '🧩 Sea3: Starting ZQuest...')
+        alert('1093', "start")
+        if k then
+            alert('1095', "case test")
+            repeat
+                task.wait(1)
+                alert('1096', 'fire')
+                print('StartResponse', Remotes.CommF_:InvokeServer("ZQuestProgress", "Begin"))
+            until CaculateDistance(Vector3.new(0, 0, 0)) > 20000
+            task.spawn(function()
+                alert("1098", "rejoin")
+                -- [FIXED - bớt delay theo yêu cầu boss man] 30s → 15s. Vẫn
+                -- giữ đủ thời gian cho server đăng ký state trước khi rejoin
+                -- ép buộc, chỉ rút phân nửa thay vì bỏ hẳn (bỏ hẳn dễ rejoin
+                -- lúc server chưa kịp lưu progress ZQuest).
+                task.wait(15)
+                game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", game.JobId)
+            end)
+            alert("attack")
+            while task.wait() do CombatController.Attack("rip_indra") end
+        end
+    end)
+
+    -- ============================================================
+    -- YAMA
+    -- ============================================================
+    FunctionsHandler.Yama:RegisterMethod('Refresh', function()
+        if SeaIndex ~= 3 then return end
+        if ScriptStorage.Backpack.Yama then return end
+        if not FunctionsHandler.Yama:Get("EliteCount") then
+            FunctionsHandler.Yama:Set("EliteCount", Remotes.CommF_:InvokeServer("EliteHunter", "Progress"))
+        end
+        if FunctionsHandler.Yama:Get('EliteCount') >= 30 then return true end
+    end)
+
+    FunctionsHandler.Yama:RegisterMethod("Start", function()
+        SetTask('SubTask', '🗡️ Getting Yama...')
+        repeat
+            task.wait()
+            TweenController.Create(game:GetService("ReplicatedStorage").FakeIslands.Waterfall:GetModelCFrame())
+        until workspace.Map:FindFirstChild("Waterfall") and workspace.Map.Waterfall:FindFirstChild("SealedKatana")
+        fireclickdetector(workspace.Map.Waterfall.SealedKatana.Hitbox.ClickDetector)
+    end)
+
+    -- ============================================================
+    -- PIRATE RAID
+    -- ============================================================
+    FunctionsHandler.PirateRaid:RegisterMethod("Refresh", function()
+        local k = FunctionsHandler.PirateRaid:Get('Senque')
+        return k and os.time() - k < 500
+    end)
+
+    FunctionsHandler.PirateRaid:RegisterMethod("Start", function()
+        local k = GetMonAsSortedRange()
+        local h = Vector3.new(-5543.5327148438, 313.80062866211, -2964.2585449219)
+        if k[1] then
+            local X, w = k[1]:FindFirstChild("Humanoid"), k[1]:FindFirstChild("HumanoidRootPart")
+            if w and X and X.Health > 0 and CaculateDistance(w.CFrame, h) < 500 then
+                CombatController.Attack(k[1].Name)
+                return
+            end
+        end
+        TweenController.Create(h)
+    end)
+
+    -- ============================================================
+    -- SOUL GUITAR - SỬA LOGIC TỪ HI.LUA + AUTO CHEST (MỚI)
+    -- ============================================================
+    -- ========== HÀM HỖ TRỢ ==========
+    local _SgSpecialItems = {
+        "God's Chalice", "Fist of Darkness", "Sweet Chalice",
+        "Hallow Essence", "Mirror Fractal"
+    }
+
+    local function _SgHasSpecialItem()
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        local char = LocalPlayer.Character
+        for _, name in ipairs(_SgSpecialItems) do
+            if bp and bp:FindFirstChild(name) then return true, name end
+            if char and char:FindFirstChild(name) then return true, name end
+        end
+        return false, nil
+    end
+
+    local function _SgGetChests()
+        local chests = {}
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Parent
+               and string.find(string.lower(obj.Name), "chest") then
+                table.insert(chests, obj)
+            end
+        end
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local pos = hrp.Position
+            table.sort(chests, function(a, b)
+                if a and b and a.Parent and b.Parent then
+                    return (pos - a.Position).Magnitude < (pos - b.Position).Magnitude
+                end
+                return false
+            end)
+        end
+        return chests
+    end
+
+    local function _SgCollectChest(chest)
+        pcall(function()
+            if not chest or not chest.Parent then return end
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+            local targetCF = chest.CFrame + Vector3.new(0, 3, 0)
+            -- [FIXED - theo yêu cầu boss man: "bỏ bypass teleport"] Bỏ nhánh
+            -- BypassTP cho rương xa (>3000 stud) — luôn dùng
+            -- TweenController.Create bình thường, không đổi spawn point nữa.
+            TweenController.Create(targetCF)
+            task.wait(0.35)
+            if firetouchinterest then
+                firetouchinterest(hrp, chest, 0)
+                task.wait()
+                firetouchinterest(hrp, chest, 1)
+            end
+        end)
+    end
+
+    local _SgChestPhaseDone = false
+    local _SgVisited = {}
+
+    local function _SgHopServer()
+        SetTask("MainTask", "🎸 Soul Guitar | Hop: Đang tìm server...")
+        local ok, servers = pcall(GetServers)
+        if ok and servers then
+            local list = {}
+            for jobId, data in pairs(servers) do
+                if jobId ~= game.JobId and not _SgVisited[jobId] then
+                    table.insert(list, {id = jobId, players = data.Count or 0})
+                end
+            end
+            table.sort(list, function(a, b) return a.players < b.players end)
+            if list[1] then
+                _SgVisited[list[1].id] = true
+                SetTask("SubTask", "🎸 Hop → " .. list[1].id:sub(1,8) .. "... (" .. list[1].players .. " players)")
+                pcall(function()
+                    game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", list[1].id)
+                end)
+                -- [FIXED - bớt delay theo yêu cầu boss man] 8s → 4s. Teleport
+                -- server thường tự cắt kết nối client trong vài giây, 4s vẫn
+                -- đủ để không chạy tiếp code khi lệnh teleport chưa kịp ăn.
+                task.wait(4)
+                _SgChestPhaseDone = false
+                return
+            end
+        end
+        pcall(function()
+            local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+            local resp = game:HttpGet(url)
+            local data = game:GetService("HttpService"):JSONDecode(resp)
+            if not data or not data.data then return end
+            table.sort(data.data, function(a, b) return (a.playing or 0) < (b.playing or 0) end)
+            for _, sv in ipairs(data.data) do
+                local slots = (sv.maxPlayers or 0) - (sv.playing or 0)
+                if slots >= 2 and sv.id ~= game.JobId and not _SgVisited[sv.id] then
+                    _SgVisited[sv.id] = true
+                    SetTask("SubTask", "🎸 Hop HTTP → " .. sv.id:sub(1,8) .. " (" .. (sv.playing or 0) .. "/" .. (sv.maxPlayers or 0) .. ")")
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", sv.id)
+                    end)
+                    -- [FIXED - bớt delay theo yêu cầu boss man] 8s → 4s (giống nhánh hop ở trên)
+                    task.wait(4)
+                    _SgChestPhaseDone = false
+                    return
+                end
+            end
+        end)
+        SetTask("MainTask", "🎸 Soul Guitar | Hop: Không tìm được server, thử lại...")
+        -- [FIXED - bớt delay theo yêu cầu boss man] retry backoff 5s → 2s
+        task.wait(2)
+    end
+
+    local function _SgRunChestBatch()
+        local hasItem, itemName = _SgHasSpecialItem()
+        if hasItem then
+            SetTask("MainTask", "🎸 Auto Chest: Found " .. itemName .. " — dừng")
+            return false
+        end
+        if ScriptStorage.Backpack["Skull Guitar"] then
+            return false
+        end
+        local chests = _SgGetChests()
+        SetTask("SubTask", "🎸 Auto Chest: " .. #chests .. " rương còn lại")
+        if #chests == 0 then
+            return false
+        end
+        for _, chest in ipairs(chests) do
+            if _G.Stop then return false end
+            local hasMid, nameMid = _SgHasSpecialItem()
+            if hasMid then
+                SetTask("MainTask", "🎸 Auto Chest: Found " .. nameMid)
+                return false
+            end
+            if chest and chest.Parent then
+                SetTask("MainTask", "🎸 Collecting: " .. chest.Name)
+                _SgCollectChest(chest)
+                task.wait(0.2)
+            end
+        end
+        return #_SgGetChests() > 0
+    end
+
+    -- ========== LOGIC CHÍNH ==========
+    FunctionsHandler.SoulGuitar:RegisterMethod("Refresh", function()
+        if not Config.Items.SoulGuitar then return end
+        if ScriptStorage.Backpack['Skull Guitar'] then return end
+        if ScriptStorage.PlayerData.Level < 2300 then return end
+
+        local ectoCount = (ScriptStorage.Backpack['Ectoplasm'] or {Count = 0}).Count or 0
+        local bonesCount = (ScriptStorage.Backpack['Bones'] or {Count = 0}).Count or 0
+        local frags = ScriptStorage.PlayerData.Fragments or 0
+
+        -- BƯỚC 1: Farm Ectoplasm đến 250 ở Sea 2
+        if ectoCount < 250 then
+            _SgChestPhaseDone = false
+            return 1
+        end
+
+        -- BƯỚC 2: Nếu chưa có Dark Fragment → farm chest → summon Blackbeard → đánh
+        if not ScriptStorage.Backpack['Dark Fragment'] then
+            if ScriptStorage.Backpack['Fist of Darkness'] then
+                return 10   -- summon & đánh Blackbeard
+            end
+            if not _SgChestPhaseDone then
+                local chests = _SgGetChests()
+                if #chests > 0 then
+                    return 9   -- auto chest
+                else
+                    _SgChestPhaseDone = true
+                    SetTask("MainTask", "🎸 Soul Guitar | Hết rương, hop server để tìm Fist of Darkness")
+                    task.spawn(_SgHopServer)
+                    return
+                end
+            else
+                _SgChestPhaseDone = false
+                return 9
+            end
+        end
+
+        -- BƯỚC 3: Đã có Dark Fragment, chuyển sang puzzle ở Sea 3
+        if SeaIndex ~= 3 then
+            SetTask('MainTask', '🎸 Soul Guitar: Teleport to Sea 3')
+            Remotes.CommF_:InvokeServer("TravelZou")
+            return
+        end
+
+        SoulGuitarProcess = Remotes.CommF_:InvokeServer("GuitarPuzzleProgress", 'Check')
+        if not SoulGuitarProcess then
+            Remotes.CommF_:InvokeServer("gravestoneEvent", 2)
+            if not CheckFullMoon() then
+                SetTask('MainTask', 'Hopping for full moon (soul guitar)')
+                _SgHopServer()
+            end
+            return 7
+        end
+        if not SoulGuitarProcess.Swamp      then return 2
+        elseif not SoulGuitarProcess.Gravestones then return 3
+        elseif not SoulGuitarProcess.Ghost  then return 4
+        elseif not SoulGuitarProcess.Trophies   then return 5
+        elseif not SoulGuitarProcess.Pipes  then return 6
+        elseif bonesCount >= 500 and frags >= 5000 and not ScriptStorage.Backpack["Skull Guitar"] then
+            return 8
+        end
+    end)
+
+    FunctionsHandler.SoulGuitar:RegisterMethod('Start', function(k)
+        if k == 9 then
+            SetTask("MainTask", "🎸 Soul Guitar | Auto Chest: Nhặt rương...")
+            local hasMore = _SgRunChestBatch()
+            if not hasMore then
+                _SgChestPhaseDone = true
+            end
+
+        elseif k == 10 then
+            SetTask('SubTask', '🎸 Soul Guitar: Summon Blackbeard')
+            local darkArenaPos = CFrame.new(-1742.0, 241.0, 1290.0)
+            TweenController.Create(darkArenaPos)
+            task.wait(1)
+            pcall(function()
+                Remotes.CommF_:InvokeServer("Blackbeard", "Spawn")
+            end)
+            task.wait(1)
+            SetTask('MainTask', '🎸 Soul Guitar: Đánh Blackbeard để lấy Dark Fragment')
+            CombatController.Attack("Blackbeard")
+
+        elseif k == 7 then
+            SetTask('SubTask', '🎸 Soul Guitar: Full moon gravestone')
+            while CaculateDistance(CFrame.new(-8654.0, 140, 6167)) > 5 do
+                task.wait()
+                TweenController.Create(CFrame.new(-8654.0, 140, 6167))
+            end
+            SoulGuitarProcess = Remotes.CommF_:InvokeServer("gravestoneEvent", 2, true)
+
+        elseif k == 1 then
+            if SeaIndex ~= 2 then
+                SetTask("SubTask", '🎸 Soul Guitar: Teleport Sea 2 để farm ectoplasm')
+                SetTask("MainTask", 'Teleport to second sea to farm ectoplasm')
+                Remotes.CommF_:InvokeServer("TravelDressrosa")
+                return
+            else
+                local ecto = (ScriptStorage.Backpack['Ectoplasm'] or {Count = 0}).Count or 0
+                SetTask("SubTask", '🎸 Soul Guitar: Farming Ectoplasm (' .. ecto .. '/250)')
+                SetTask("MainTask", "Soul Guitar | Ectoplasm " .. ecto .. "/250")
+                CombatController.Attack({"Ship Deckhand", "Ship Engineer", 'Ship Steward', "Ship Officer"})
+                return
+            end
+
+        elseif k == 2 then
+            SetTask('SubTask', '🎸 Soul Guitar: Kill Living Zombies (Swamp)')
+            TTL9 = TTL9 or 0
+            if os.time() ~= LastestTime1 then
+                TTL9 = TTL9 + 1
+                LastestTime1 = os.time()
+            end
+            if TTL9 > 60 then _SgHopServer() return end
+
+            local zombies = {}
+            for _, enemy in ipairs(Services.Workspace.Enemies:GetChildren()) do
+                if enemy.Name == "Living Zombie" then
+                    table.insert(zombies, enemy)
+                end
+            end
+
+            if #zombies < 6 then
+                SetTask('MainTask', 'Soul Guitar: Waiting Living Zombies (' .. #zombies .. '/6)')
+                TweenController.Create(ScriptStorage.MobRegions["Living Zombie"][1] + Vector3.new(0, 30, 0))
+            else
+                local startT = os.time()
+                for idx, zombie in ipairs(zombies) do
+                    local hum  = zombie:FindFirstChild("Humanoid")
+                    local root = zombie:FindFirstChild("HumanoidRootPart")
+                    if not hum or not root then continue end
+                    while task.wait() and hum.Health > 7000 do
+                        SetTask('MainTask', 'Soul Guitar: Weakening zombie ' .. idx .. '/' .. #zombies)
+                        FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call('Melee')
+                        if os.time() - startT > 60 then _SgHopServer() return end
+                        TweenController.Create(root.CFrame + Vector3.new(0, 50, 0))
+                        pcall(function() _G.FastAttack = os.time() end)
+                    end
+                end
+                SetTask("MainTask", 'Soul Guitar: Finishing all Living Zombies')
+                local killT = os.time()
+                while workspace.Enemies:FindFirstChild("Living Zombie") and task.wait() do
+                    if os.time() - killT > 60 then _SgHopServer() return end
+                    CombatController.Attack('Living Zombie')
+                end
+                TTL9 = 0
+            end
+
+        elseif k == 3 then
+            SetTask('SubTask', '🎸 Soul Guitar: Placard puzzle')
+            local castle = workspace.Map["Haunted Castle"]
+            while CaculateDistance(CFrame.new(-8800.0, 178, 6033)) > 10 do
+                task.wait()
+                SetTask("MainTask", "Soul Guitar: Completing placards...")
+                TweenController.Create(CFrame.new(-8800.0, 178, 6033))
+            end
+            for placadName, dir in pairs({
+                Placard1 = "Right", Placard2 = "Right", Placard3 = "Left",
+                Placard4 = "Right", Placard5 = "Left", Placard6 = "Left", Placard7 = "Left"
+            }) do
+                pcall(function() fireclickdetector(castle[placadName][dir].ClickDetector) end)
+            end
+
+        elseif k == 4 then
+            SetTask('SubTask', '🎸 Soul Guitar: Ghost task')
+            Remotes.CommF_:InvokeServer("GuitarPuzzleProgress", "Ghost")
+
+        elseif k == 5 then
+            SetTask('SubTask', '🎸 Soul Guitar: Trophy puzzle')
+            if CaculateDistance(CFrame.new(-9530.0126953125, 6.104853630065918, 6054.83349609375)) > 30 then
+                TweenController.Create(CFrame.new(-9530.0126953125, 6.104853630065918, 6054.83349609375))
+            else
+                local tablet = workspace.Map['Haunted Castle'].Tablet
+                for _, segName in pairs(BlankTablets) do
+                    local seg = tablet[segName]
+                    if seg and seg.Line.Rotation.Z ~= 0 then
+                        repeat task.wait() fireclickdetector(seg.ClickDetector)
+                        until seg.Line.Rotation.Z == 0
+                    end
+                end
+                for segName, trophyName in pairs(Trophy) do
+                    pcall(function()
+                        local handle = workspace.Map["Haunted Castle"].Trophies.Quest[trophyName].Handle
+                        local rotPart = tostring(handle.CFrame):split(", ")[4]
+                        local targetRot = (rotPart == "1" or rotPart == "-1") and "90" or "180"
+                        local seg = tablet[segName]
+                        if seg and not string.find(tostring(seg.Line.Rotation.Z), targetRot) then
+                            repeat task.wait() fireclickdetector(seg.ClickDetector)
+                            until string.find(tostring(seg.Line.Rotation.Z), targetRot)
+                        end
+                    end)
+                end
+            end
+
+        elseif k == 6 then
+            SetTask('SubTask', '🎸 Soul Guitar: Pipe puzzle')
+            for pipeName, colorName in pairs(Pipes) do
+                pcall(function()
+                    local pipe = workspace.Map['Haunted Castle']['Lab Puzzle'].ColorFloor.Model[pipeName]
+                    if pipe and pipe.BrickColor.Name ~= colorName then
+                        repeat task.wait() fireclickdetector(pipe.ClickDetector)
+                        until pipe.BrickColor.Name == colorName
+                    end
+                end)
+            end
+            Remotes.CommF_:InvokeServer('soulGuitarBuy')
+
+        elseif k == 8 then
+            SetTask('SubTask', '🎸 Soul Guitar: Buying Skull Guitar')
+            Remotes.CommF_:InvokeServer('soulGuitarBuy')
+        end
+    end)
+    -- ============================================================
+    -- KẾT THÚC PHẦN SOUL GUITAR
+    -- ============================================================
+
+    -- ============================================================
+    -- TUSHITA
+    -- ============================================================
+    FunctionsHandler.Tushita:RegisterMethod("Refresh", function()
+        if ScriptStorage.Backpack.Tushita then return end
+        if ScriptStorage.PlayerData.Level < 2000 then return end
+        if SeaIndex ~= 3 then return end
+        TushitaProgress = TushitaProgress or Remotes.CommF_:InvokeServer("TushitaProgress")
+        if not TushitaProgress.OpenedDoor then
+            if ScriptStorage.Enemies["rip_indra True Form"] then
+                TushitaProgress = nil
+                return 1
+            end
+        else
+            if ScriptStorage.Enemies['Longma'] then
+                TushitaProgress = nil
+                return 2
+            end
+        end
+    end)
+
+    FunctionsHandler.Tushita:RegisterMethod('Start', function(k)
+        if k == 1 then
+            SetTask('SubTask', '🗡️ Tushita: Placing torches (Step 1)')
+            alert('Auto Tushita', 'Placing torches...')
+            TweenController.Create(CFrame.new(5714, math.random(19, 21), 256))
+            if ScriptStorage.Tools["Holy Torch"] then
+                for W = 1, 5 do Remotes.CommF_:InvokeServer("TushitaProgress", "Torch", W) end
+                return true
+            end
+        elseif k == 2 then
+            SetTask('SubTask', '🗡️ Tushita: Defeating Longma (Step 2)')
+            alert("Auto Tushita", "Defeating Longma")
+            CombatController.Attack("Longma")
+        end
+    end)
+
+    -- ============================================================
+    -- CURSED DUAL KATANA (CDK)
+    -- ============================================================
+    FunctionsHandler.CursedDualKatana:RegisterMethod("Refresh", function()
+        if not Config.Items.CursedDualKatana then return end
+        local k = ScriptStorage.Backpack
+        if ScriptStorage.PlayerData.Level < 2200 then return end
+        -- [FIXED - theo spec] Trước đây thiếu mastery 350 thì chỉ `return`
+        -- im lặng, không chủ động làm gì. Giờ trả tín hiệu "trainSwords" để
+        -- Start() chuyển sang farm Bones tại Haunted Castle, check mastery
+        -- mỗi giây, chỉ khi CẢ HAI Yama+Tushita >= 350 mới cho CDK bắt đầu.
+        if k["Cursed Dual Katana"] then return end
+        if not k.Tushita or (k.Tushita.Mastery or 0) < 350 or not k.Yama or (k.Yama.Mastery or 0) < 350 then
+            return {"trainSwords"}
+        end
+        if SeaIndex ~= 3 then return end
+        local k = CdkProgess or Remotes.CommF_:InvokeServer("CDKQuest", 'Progress') or 'uwu'
+        if not k or k == 'uwu' then return end
+        if workspace.Map.Turtle.Cursed:FindFirstChild("Breakable") then
+            alert('Cursed Dual Katana', 'Open Door')
+            return {"break"}
+        end
+        local W = {Good = 'Tushita', Evil = 'Yama'}
+        if k.Good == 4 and k.Evil == 4 then
+            print("burn 2")
+            return {'burn 2'}
+        end
+        if k.Good == 3 or k.Evil == 3 then
+            print('burn 1')
+            return {"burn"}
+        end
+        if k.Opened then
+            for h, X in k do
+                if h ~= 'Opened' and h ~= "Finished" and X < 3 then
+                    print(h, X)
+                    ScriptStorage.CdkCache = {h, X + 1}
+                    if not ScriptStorage.Tools[W[h]] then Remotes.CommF_:InvokeServer('LoadItem', W[h]) end
+                    alert("Cursed Dual Katana", "Start " .. tostring(W[h]) .. ' ' .. tostring(h))
+                    Remotes.CommF_:InvokeServer('CDKQuest', 'StartTrial', h)
+                    SetTask("MainTask", "Cursed Dual Katana - " .. tostring(W[h]) .. ' ' .. tostring(h))
+                    return false
+                end
+            end
+        end
+        local k = ScriptStorage.CdkCache
+        if not k then return end
+        local W, h = k[1], k[2]
+        if W == "Evil" and h == 3 then
+            -- [FIXED] Trước đây chỉ set ForceToRollBone=true rồi đứng im —
+            -- biến đó không có handler nào đọc, nên bước này bị TREO VĨNH
+            -- VIỄN. Thay bằng chuỗi thật: Bones → Hallow Essence → equip
+            -- tại toạ độ triệu hồi → Soul Reaper xuất hiện → đánh.
+            -- (verified từ main_red_magic_beta.txt + raw_6, khớp nhau)
+            local HALLOW_SUMMON_CF = CFrame.new(-8932.86, 143.258, 6063.31)
+
+            if ScriptStorage.Enemies['Soul Reaper'] then
+                -- Đã lên rồi → đánh, không cần làm gì thêm ở nhánh này
+                return k
+            end
+
+            local hasHallow = ScriptStorage.Backpack["Hallow Essence"]
+                or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Hallow Essence"))
+
+            if hasHallow then
+                SetTask('SubTask', 'CDK Quest / Dùng Hallow Essence triệu hồi Soul Reaper')
+                TweenController.Create(HALLOW_SUMMON_CF)
+                if CaculateDistance(HALLOW_SUMMON_CF) <= 8 then
+                    FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call("Hallow Essence")
+                end
+                return
+            else
+                -- [FIXED] Ngưỡng thật là 500 Bones, không phải 50 — verified
+                -- từ raw_6.txt ("CheckItem(Bones) > 500"). Dưới 500 thì farm
+                -- tiếp, KHÔNG bắn Buy (dư/thiếu bones lẻ tẻ không đủ đổi).
+                local bonesCount = Remotes.CommF_:InvokeServer("Bones", "Check")
+                SetTask('SubTask', 'CDK Quest / Farm Bones cho Hallow Essence (' .. tostring(bonesCount) .. '/500)')
+
+                if bonesCount and bonesCount > 500 then
+                    -- [FIXED] Đủ 500 → xả hết 1 lượt (verified: repeat Buy(1,1)
+                    -- cho tới khi Check == 0), không nhỏ giọt từng lần 1 nữa
+                    repeat
+                        Remotes.CommF_:InvokeServer("Bones", "Buy", 1, 1)
+                        task.wait(0.2)
+                        bonesCount = Remotes.CommF_:InvokeServer("Bones", "Check")
+                    until not bonesCount or bonesCount <= 0
+                    return
+                end
+
+                if not ScriptStorage.Enemies["Reborn Skeleton"] and not ScriptStorage.Enemies["Living Zombie"]
+                    and not ScriptStorage.Enemies["Demonic Soul"] and not ScriptStorage.Enemies["Posessed Mummy"] then
+                    -- [NEW] Chưa thấy xác gần đây → di chuyển tới đúng điểm
+                    -- farm Haunted Castle thay vì đứng im chờ
+                    SetTask('SubTask', 'CDK Quest / Di chuyển tới Haunted Castle farm Bones')
+                    TweenController.Create(HAUNTED_CASTLE_BONES_CF)
+                    return
+                end
+                CombatController.Attack({"Reborn Skeleton", "Living Zombie", "Demonic Soul", "Posessed Mummy"})
+                return
+            end
+        elseif W == 'Good' then
+            if h == 2 then
+                SetTask("SubTask", 'CDK Quest / Waiting until pirate raid started')
+                return
+            elseif h == 3 and not ScriptStorage.Enemies["Cake Queen"] then
+                Hop()
+                SetTask('SubTask', "CDK Quest / Waiting until Cake Queen boss spawned")
+                return
+            end
+        end
+        return k
+    end)
+
+    FunctionsHandler.CursedDualKatana:RegisterMethod("GetHazeMon", function()
+        local k = {}
+        for W, W in LocalPlayer.QuestHaze:GetChildren() do if W.Value > 0 then table.insert(k, W) end end
+        table.sort(k, function(W, h) return CaculateDistance(W:GetAttribute('Position')) < CaculateDistance(h:GetAttribute('Position')) end)
+        return tostring(k[1])
+    end)
+
+    FunctionsHandler.CursedDualKatana:RegisterMethod("DoDimension", function(k)
+        local W = string.gsub(k, ' ', "")
+        local k = os.time()
+        repeat
+            task.wait()
+            TweenController.Create(LocalPlayer.Character.HumanoidRootPart.CFrame)
+            if os.time() - k > 60 then return end
+        until os.time() - TorchEnabledTime < 10
+        repeat
+            task.wait()
+            local k = workspace.Map:WaitForChild(W, 10)
+            if k then
+                for h, h in k:GetChildren() do
+                    if h and string.find(h.Name, "Torch") and h:FindFirstChild('ProximityPrompt') and h.ProximityPrompt.Enabled then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = h.CFrame
+                        h.ProximityPrompt.HoldDuration = 0
+                        task.wait(1)
+                        local X = game:GetService("VirtualInputManager")
+                        X:SendKeyEvent(true, "E", 0, game)
+                        X:SendKeyEvent(false, "E", 0, game)
+                        fireproximityprompt(workspace.Map:WaitForChild(W, 10):FindFirstChild(tostring(h)).ProximityPrompt)
+                    end
+                    for W, W in workspace.Enemies:GetChildren() do
+                        local h = W:FindFirstChild("HumanoidRootPart")
+                        local X = W:FindFirstChild("Humanoid")
+                        if h and X and CaculateDistance(h.CFrame) < 1000 then CombatController.Attack(W.Name) end
+                    end
+                end
+                ExitDoor = k:FindFirstChild("Exit")
+                print("exit door", ExitDoor)
+                if ExitDoor then
+                    PortalBrick = tostring(ExitDoor.BrickColor)
+                    print("Brick color", ExitDoor, ExitDoor.BrickColor, PortalBrick)
+                end
+            else
+                print('no island idk wt-')
+            end
+            print('loop damn', PortalBrick)
+        until PortalBrick == 'Olive' or PortalBrick == "Cloudy grey"
+        print('leave')
+        while os.time() - DoneCdkTick > 15 do
+            TweenController.Create(ExitDoor.CFrame + Vector3.new(0, math.random(1, 5), 0))
+            task.wait()
+        end
+        Hop()
+    end)
+
+    FunctionsHandler.CursedDualKatana:RegisterMethod("Start", function(k)
+        local W = workspace.Map.Turtle.Cursed
+        if k[1] == "trainSwords" then
+            -- [NEW - theo spec] Yama/Tushita chưa đủ 350 mastery — farm
+            -- Bones tại Haunted Castle, trang bị đúng kiếm đang thiếu để
+            -- mastery tính đúng vũ khí. Bones thu được dùng chung cho Fire
+            -- Essence (Dragon Talon) và Hallow Essence (CDK) sau này.
+            local bp = ScriptStorage.Backpack
+            local tushitaMastery = bp.Tushita and bp.Tushita.Mastery or 0
+            local yamaMastery    = bp.Yama and bp.Yama.Mastery or 0
+
+            local swordToTrain = nil
+            if not bp.Tushita then
+                swordToTrain = "buy_tushita"
+            elseif tushitaMastery < 350 then
+                swordToTrain = "Tushita"
+            elseif not bp.Yama then
+                swordToTrain = "buy_yama"
+            elseif yamaMastery < 350 then
+                swordToTrain = "Yama"
+            end
+
+            if swordToTrain == "buy_tushita" or swordToTrain == "buy_yama" then
+                SetTask('MainTask', 'CDK Prep | Chưa có ' .. (swordToTrain == "buy_tushita" and "Tushita" or "Yama") .. ' — chờ Tushita/Yama handler mua')
+                return
+            end
+
+            SetTask('MainTask', string.format('CDK Prep | Tushita %d/350, Yama %d/350', tushitaMastery, yamaMastery))
+
+            if swordToTrain then
+                pcall(function()
+                    FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call(swordToTrain)
+                end)
+            end
+
+            if not ScriptStorage.Enemies["Reborn Skeleton"] and not ScriptStorage.Enemies["Living Zombie"]
+                and not ScriptStorage.Enemies["Demonic Soul"] and not ScriptStorage.Enemies["Posessed Mummy"] then
+                SetTask('SubTask', 'CDK Prep | Di chuyển tới Haunted Castle')
+                TweenController.Create(HAUNTED_CASTLE_BONES_CF)
+                return
+            end
+            CombatController.Attack({"Reborn Skeleton", "Living Zombie", "Demonic Soul", "Posessed Mummy"})
+            return
+        end
+        if k[1] == 'break' then
+            SetTask('SubTask', '⚔️ CDK: Opening door')
+            TweenController.Create(workspace.Map.Turtle.Cursed.Breakable.CFrame)
+            Remotes.CommF_:InvokeServer('CDKQuest', "OpenDoor")
+            Remotes.CommF_:InvokeServer("CDKQuest", "OpenDoor", true)
+            workspace.Map.Turtle.Cursed.Breakable:Destroy()
+            CdkProgess = nil
+            return
+        end
+        if k[1] == "burn 2" then
+            SetTask('SubTask', '⚔️ CDK: Burning pedestals (step 2)')
+            if workspace.Map.Turtle.Cursed.Pedestal3.ProximityPrompt.Enabled then
+                fireproximityprompt(workspace.Map.Turtle.Cursed.Pedestal3.ProximityPrompt)
+                task.wait(1)
+                pcall(function() LocalPlayer.Character.Humanoid.Health = 0 end)
+                -- [FIXED - bớt delay theo yêu cầu boss man] 10s → 5s. Đây là
+                -- chờ respawn sau self-kill, 5s vẫn đủ dư so với thời gian
+                -- respawn thực tế (thường 2-3s) của Blox Fruits.
+                task.wait(5)
+            else
+                CDKAttempts = (CDKAttempts or 0) + 1
+                TweenController.Create(CFrame.new(-12341.66796875, 603.3455810546875, -6550.6064453125))
+                -- [FIXED - bớt delay theo yêu cầu boss man] 5s/5s → 3s/3s
+                task.wait(3)
+                pcall(function() LocalPlayer.Character.Humanoid.Health = 0 end)
+                task.wait(3)
+                if CDKAttempts > 5 then Hop() end
+                CdkProgess = nil
+            end
+        elseif k[1] == "burn" then
+            SetTask('SubTask', '⚔️ CDK: Burning pedestals')
+            for W = 1, 3, 1 do
+                local h = workspace.Map.Turtle.Cursed:FindFirstChild("Pedestal" .. W)
+                if workspace.Map.Turtle.Cursed:FindFirstChild('Pedestal' .. W).ProximityPrompt.Enabled then
+                    repeat
+                        task.wait()
+                        TweenController.Create(workspace.Map.Turtle.Cursed:FindFirstChild('Pedestal' .. W).CFrame)
+                    until CaculateDistance(workspace.Map.Turtle.Cursed:FindFirstChild("Pedestal" .. W).CFrame) < 5
+                    fireproximityprompt(workspace.Map.Turtle.Cursed:FindFirstChild("Pedestal" .. W).ProximityPrompt)
+                    task.wait(3)
+                    pcall(function() LocalPlayer.Character.Humanoid.Health = 0 end)
+                end
+                CdkProgess = nil
+            end
+        elseif k[1] == 'Evil' then
+            if k[2] == 1 then
+                SetTask('SubTask', '⚔️ CDK: Evil trial - Forest Pirate')
+                local W = ScriptStorage.Enemies["Forest Pirate"]
+                TweenController.Create((W and W.HumanoidRootPart.CFrame) or ScriptStorage.MobRegions["Forest Pirate"][0])
+                CdkProgess = nil
+            elseif k[2] == 2 then
+                SetTask('SubTask', '⚔️ CDK: Evil trial - Haze monster')
+                CombatController.Attack(FunctionsHandler.CursedDualKatana.Methods.GetHazeMon:Call())
+                CdkProgess = nil
+            elseif k[2] == 3 then
+                SetTask('SubTask', '⚔️ CDK: Evil trial - Soul Reaper')
+                Report("found cdk yama 3")
+                while not (os.time() - TorchEnabledTime < 100 or not ScriptStorage.Enemies["Soul Reaper"]) do
+                    print("tweening to soul reaper")
+                    task.wait()
+                    if FunctionsHandler.RaidController.Methods.GetCurrentRaidIsland:Call() then
+                        pcall(function() LocalPlayer.Character.Humanoid.Health = 0 end)
+                    end
+                    TweenController.Create(ScriptStorage.Enemies["Soul Reaper"]:GetModelCFrame())
+                end
+                if not ScriptStorage.Enemies["Soul Reaper"] then return end
+                FunctionsHandler.CursedDualKatana.Methods.DoDimension.Callback("Hell Dimension")
+                CdkProgess = nil
+            end
+        else
+            if k[2] == 1 then
+                SetTask('SubTask', '⚔️ CDK: Good trial - Boat Dealer')
+                for W, W in game.ReplicatedStorage.NPCs:GetChildren() do
+                    if W.Name == "Luxury Boat Dealer" then
+                        repeat
+                            task.wait()
+                            if os.time() - DoneCdkTick < 15 then return end
+                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = (W:GetModelCFrame())
+                            RealNPC = nil
+                            for h, h in workspace.NPCs:GetChildren() do
+                                if CaculateDistance(h:GetModelCFrame(), W:GetModelCFrame()) < 20 then
+                                    RealNPC = h
+                                    break
+                                end
+                            end
+                        until CaculateDistance(W:GetModelCFrame()) < 5 and RealNPC
+                        Remotes.CommF_:InvokeServer("CDKQuest", "BoatQuest", RealNPC)
+                    end
+                end
+                CdkProgess = nil
+            elseif k[2] == 3 then
+                SetTask('SubTask', '⚔️ CDK: Good trial - Cake Queen')
+                repeat
+                    task.wait()
+                    print('attacking cage queen')
+                    CombatController.Attack("Cage Queen")
+                until os.time() - TorchEnabledTime < 10 or not ScriptStorage.Enemies['Cake Queen']
+                TweenController.Create(LocalPlayer.Character.HumanoidRootPart.CFrame)
+                Report('Cake Queen')
+                FunctionsHandler.CursedDualKatana.Methods.DoDimension.Callback("Heavenly Dimension")
+                CdkProgess = nil
+            end
+        end
+    end)
+
+    -- ============================================================
+    -- NOTIFICATION LISTENERS
+    -- ============================================================
+    local k = {Listeners = {}}
+    TorchEnabledTime = 0
+    DoneCdkTick = 0
+    getgenv().NotificationCallBack = (function(W)
+        for h, X in k.Listeners do
+            if string.find(string.lower(W), string.lower(h)) then X(W) end
+        end
+    end)
+    function k:RegisterNotifyListener(W, h) k.Listeners[W] = h end
+    k:RegisterNotifyListener('go!', function() LastRaidAlert = os.time() end)
+    k:RegisterNotifyListener('raid', function() LastRaidAlert2 = os.time() end)
+    k:RegisterNotifyListener("been spotted approaching", function() FunctionsHandler.PirateRaid:Set('Senque', os.time()) end)
+    k:RegisterNotifyListener('job', function() FunctionsHandler.PirateRaid:Set('Senque', 0) end)
+    k:RegisterNotifyListener("level", function() AddPoint() end)
+    k:RegisterNotifyListener("torch", function() TorchEnabledTime = os.time() end)
+    k:RegisterNotifyListener("scroll reacts", function() DoneCdkTick = os.time() end)
+    k:RegisterNotifyListener("elite", function()
+        FunctionsHandler.Yama:Set('EliteCount', Remotes.CommF_:InvokeServer("EliteHunter", "Progress"))
+        alert("[MeyyHub ] ", "Elite defeated: " .. tostring(FunctionsHandler.Yama:Get("EliteCount") or 'n/a'))
+    end)
+    k:RegisterNotifyListener('the raid with', function()
+        if ScriptStorage.PlayerData.Level < MaxLevel then return end
+        Remotes.CommF_:InvokeServer('Awakener', "Awaken")
+    end)
+    k:RegisterNotifyListener('quest completed', function()
+        J:RefreshQuest()
+        task.wait()
+        if not J:GetCurrentClaimQuest() then J:MarkAsCompleted() end
+    end)
+    local k
+    k = hookfunction(require(game.ReplicatedStorage.Notification).new, function(W, h)
+        v21 = tostring(tostring(W or '') .. tostring(h or "")) or ""
+        getgenv().NotificationCallBack(v21)
+        return k(W, h)
+    end)
+
+    -- ============================================================
+    -- SERVER MANAGEMENT
+    -- ============================================================
+    if SeaIndex ~= 1 then end
+    function IfTableHaveIndex(k) for W in k do return true end end
+    print(1)
+    function GetServers()
+        if LastServersDataPulled then
+            if os.time() - LastServersDataPulled < 60 then return CachedServers end
+        end
+        for k = 1, 100, 1 do
+            local W = game:GetService("ReplicatedStorage"):WaitForChild("__ServerBrowser"):InvokeServer(k)
+            if IfTableHaveIndex(W) then
+                LastServersDataPulled = os.time()
+                CachedServers = W
+                return W
+            end
+        end
+    end
+    spawn(function()
+        GetServers()
+        -- [FIXED - bớt delay theo yêu cầu boss man] 180s → 90s. Không rút
+        -- sâu hơn nữa để tránh spam API server-list của Roblox (public API
+        -- có rate-limit thật), 90s vẫn đủ nhanh để danh sách hop không bị cũ.
+        while task.wait(90) do GetServers() end
+    end)
+    function Hop(k, W)
+        local h = GetServers()
+        local X = {}
+        for w, D in h do
+            table.insert(X, {JobId = w, Players = D.Count, LastUpdate = D.__LastUpdate, Region = D.Region})
+        end
+        print(#X, "servers received")
+        for h = 1, #X do
+            while task.wait() do
+                local h = math.random(1, #X)
+                ServerData = X[h]
+                if ServerData then
+                    if not k or ServerData.Players < k then
+                        if not W or ServerData.Regoin == W then
+                            print("Found Server:", ServerData.JobId, "Player Count:", ServerData.Players, 'Region:', ServerData.Region)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+        print('Teleporting to', ServerData.JobId, "..")
+        game:GetService("ReplicatedStorage"):WaitForChild('__ServerBrowser'):InvokeServer("teleport", ServerData.JobId)
+    end
+    LowHop = function(k, k)
+        local k = {}
+        local W = game:HttpGet('https://games.roblox.com/v1/games/' .. game.PlaceId .. '/servers/Public?sortOrder=Asc&limit=100&excludeFullGames=true')
+        local h = game:GetService("HttpService"):JSONDecode(W)
+        if h and h.data then
+            for W, W in next, h.data do
+                if type(W) == "table" and tonumber(W.playing) and tonumber(W.maxPlayers) and W.playing < 5 and W.id ~= JobId then
+                    table.insert(k, 1, W.id)
+                end
+            end
+        end
+        if #k > 0 then
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, k[math.random(1, #k)], game.Players.LocalPlayer)
+        else
+            return alert('Serverhop', "Couldn't find a server.")
+        end
+    end
+
+    -- ============================================================
+    -- STORAGE
+    -- ============================================================
+    Storage = {WRITE_DELAY = .5, Data = {}}
+    Services = {}
+    setmetatable(Services, {__index = function(k, k) return game:GetService(k) end})
+    LocalPlayer = game.Players.LocalPlayer
+    local k = ".storage_u_" .. tostring(LocalPlayer)
+    function Decode(W) return Services.HttpService:JSONDecode(W) end
+    function Encode(W) return Services.HttpService:JSONEncode(W) end
+    print(5)
+    function Storage.Set(W, h, X) W.Data[h] = X end
+    function Storage.Get(W, h) return W.Data[h] end
+    function Storage.Save(W) pcall(function() if writefile then writefile(k, Encode(W.Data)) end end) end
+    if isfile and readfile and not isfile(k) then
+        pcall(writefile, k, "{}")
+        task.wait(1)
+    end
+    Storage.Data = {}
+    if readfile then pcall(function() Storage.Data = Decode(readfile(k) or '{}') end) end
+    spawn(function() while task.wait(Storage.WRITE_DELAY) do Storage:Save() end end)
+    CreateTraceback('Initalize', "Initalizing script..")
+    local k = {}
+    SetTask("MainTask", 'Level Farming')
+    SetTask("SubTask", "Idle")
+    ParsingTimes = 0
+    function RefreshTasksData()
+        if _G.Stop then return end
+        for W, W in TasksOrder do
+            local h = FunctionsHandler[W]
+            if not h.Initalized then
+                if not k[W] then
+                    print("[ Debug ] Task", Name, "is not registered yet")
+                    k[W] = true
+                end
+            else
+                local k = h.Methods.Refresh
+                local X = h.Methods.Start
+                if k then
+                    local h = k:Call(ParsingTimes < 100)
+                    ParsingTimes = ParsingTimes + 1
+                    if h and ParsingTimes > 100 then
+                        CurrentTask = CurrentTask ~= W
+                        CurrentTask = W
+                        ScriptStorage.Interface.SetText('DebugLine', W)
+                        X:Call(h)
+                        return
+                    end
+                end
+            end
+        end
+    end
+    SetText('MainTextLabel', "Refreshing Player Items..")
+    AddPoint()
+    J:RefreshQuest()
+    RefreshInventory()
+    Remotes.CommE.OnClientEvent:Connect(function(...)
+        local J = {...}
+        if string.find(J[1], 'Item') then RefreshInventory() end
+    end)
+    RefreshRace()
+    a.LocalPlayer.Idled:Connect(function()
+        Services.VirtualUser:CaptureController()
+        Services.VirtualUser:ClickButton2(Vector2.new())
+    end)
+    SetText("MainTextLabel", 'Loaded In ' .. tick() - StartTick .. 'ms!')
+    -- ============================================================
+    -- [REPLACED] FPS BOOSTER — hàm cũ EnableFpsBoost() có "if true then
+    -- return end" ngay dòng đầu, khiến TOÀN BỘ ~100 dòng optimize không
+    -- bao giờ chạy dù Config.Configuration.FpsBoost = true hay false.
+    -- Thay bằng logic raw9jjs.txt (đơn giản, verified hoạt động): chuyển
+    -- xám toàn bộ map + nhân vật, tắt particle/trail, hạ QualityLevel.
+    -- Theo dõi DescendantAdded liên tục — object mới spawn ra (quái, boss,
+    -- item) cũng tự động bị áp dụng, không cần chạy lại thủ công.
+    -- ============================================================
+    local function GrayAndOptimize(object)
+        if object:IsA("BasePart") or object:IsA("MeshPart") or object:IsA("UnionOperation") then
+            object.Material = Enum.Material.Plastic
+            object.Reflectance = 0
+            if not object.Name:find("Handle") and not object.Name:find("Attachment") then
+                pcall(function() object.Color = Color3.fromRGB(128, 128, 128) end)
+            end
+        end
+        if object:IsA("Decal") or object:IsA("Texture") then
+            object.Transparency = 1
+        end
+        if object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Smoke") or object:IsA("Fire") then
+            object.Enabled = false
+        end
+    end
+
+    local function EnableFpsBoost()
+        if not (Config.Configuration and Config.Configuration.FpsBoost) then return end
+        task.spawn(function()
+            pcall(function()
+                Services.Lighting.GlobalShadows = false
+                Services.Lighting.Brightness = 1
+                Services.Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+                if settings and settings().Rendering then
+                    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+                end
+
+                for _, descendant in ipairs(workspace:GetDescendants()) do
+                    pcall(GrayAndOptimize, descendant)
+                end
+
+                local function onCharacterAdded(character)
+                    if not character then return end
+                    task.wait(0.5)
+                    for _, descendant in ipairs(character:GetDescendants()) do
+                        pcall(GrayAndOptimize, descendant)
+                    end
+                end
+                if LocalPlayer and LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
+                LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+                Services.Players.PlayerAdded:Connect(function(player)
+                    player.CharacterAdded:Connect(onCharacterAdded)
+                end)
+
+                -- [FIXED - LAG] task.wait(0.1) TRONG event handler chạy cho
+                -- MỌI object thêm vào workspace là nguồn lag rất lớn — lúc
+                -- farm boss/raid/quest, hàng trăm object sinh ra mỗi giây
+                -- (particle, projectile, xác quái, hiệu ứng đòn đánh...),
+                -- MỖI CÁI đều tạo 1 lần yield 100ms → dồn ứ lịch chạy, đúng
+                -- khớp mô tả "farm boss/lv/quest rất lag" của boss man.
+                -- Bỏ hẳn wait, không cần thiết (set Color/Material ngay sau
+                -- khi object được tạo là an toàn). Thêm lọc loại object
+                -- SỚM để khỏi tốn pcall cho thứ chắc chắn không liên quan
+                -- đồ hoạ (Script, Sound, Folder, Value...).
+                local GRAYABLE_CLASSES = {
+                    BasePart = true, MeshPart = true, UnionOperation = true,
+                    Decal = true, Texture = true, ParticleEmitter = true,
+                    Trail = true, Smoke = true, Fire = true,
+                }
+                workspace.DescendantAdded:Connect(function(descendant)
+                    if not (Config.Configuration and Config.Configuration.FpsBoost) then return end
+                    if not GRAYABLE_CLASSES[descendant.ClassName] then return end
+                    pcall(GrayAndOptimize, descendant)
+                end)
+
+                print("[✅ FPS Boost] Đã bật gray mode + giảm đồ hoạ (raw9jjs)")
+            end)
+        end)
+    end
+    EnableFpsBoost()
+    QueueList = {}
+    function NearbyHopHandler()
+        do return end
+        if NearbyHopHandlerDebounce and os.time() - NearbyHopHandlerDebounce < 10 then return end
+        NearbyHopHandlerDebounce = os.time()
+        for J, J in a:GetPlayers() do
+            local k = J and J.Character and J.Character:FindFirstChild("HumanoidRootPart") and J.Character.HumanoidRootPart.Position
+            if k then
+                local W = QueueList[J.Name]
+                if not W then
+                    QueueList[J.Name] = os.time()
+                else
+                    if os.time() - W > 30 then
+                        if CaculateDistance(k) < 100 then
+                            Hop('nearby plr')
+                            -- [FIXED - bớt delay theo yêu cầu boss man] 5s → 2s
+                            task.wait(2)
+                        else
+                            QueueList[J.Name] = nil
+                        end
+                    end
+                end
+            end
+        end
+    end
+    task.spawn(function()
+        while task.wait() do
+            if not _G.Stop then
+                NearbyHopHandler()
+                if LocalPlayer.Character:FindFirstChild('Humanoid') and LocalPlayer.Character.Humanoid.Sit then
+                    LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+                pcall(RefreshPlayerData)
+                local J = os.time() - timeee
+                local r = J + OldSessionTime
+                if writefile then pcall(writefile, ".tdif-" .. game.Players.LocalPlayer.Name, tostring(r)) end
+                if ScriptStorage.Interface then
+                    SetText('LiveTime', "Total Elapsed Time: " .. DispTime(r, true) .. ' Elapsed Time: ' .. DispTime(J, true))
+                end
+                RefreshDebounce = os.time()
+            end
+        end
+    end)
+    AddPoint()
+    Remotes.CommF_:InvokeServer("Cousin", 'Buy')
+    task.spawn(function()
+        task.wait(Config.Configuration.AutoHopDelay)
+        if not Config.Configuration.AutoHop then Hop('Autohop') end
+    end)
+
+    -- ============================================================
+    -- AUTO SEA 2 & 3 (CÁC THREAD RIÊNG)
+    -- ============================================================
+    task.spawn(function()
+        while task.wait(0.5) do
+            if Config.AutoSea2 then
+                pcall(function()
+                    if ScriptStorage.PlayerData.Level >= 700 and SeaIndex ~= 2 then
+                        _G.SeaTransitionActive = true  -- [ADDED] đồng bộ với AutoSea3, tránh LevelFarm giành tween
+                        local iceDoor = workspace.Map.Ice.Door
+                        if iceDoor and iceDoor.CanCollide == true and iceDoor.Transparency == 0 then
+                            Remotes.CommF_:InvokeServer("DressrosaQuestProgress", "Detective")
+                            FunctionsHandler.LocalPlayerController.Methods.EquipTool:Call("Key")
+                            TweenController.Create(CFrame.new(1347.71, 37.38, -1325.65))
+                            repeat task.wait() until not Config.AutoSea2 or (HumanoidRootPart and (HumanoidRootPart.Position - Vector3.new(1347.71, 37.38, -1325.65)).Magnitude < 5)
+                        elseif iceDoor and iceDoor.CanCollide == false and iceDoor.Transparency == 1 then
+                            if workspace.Enemies:FindFirstChild("Ice Admiral") then
+                                CombatController.Attack("Ice Admiral")
+                                repeat task.wait() until not Config.AutoSea2 or not workspace.Enemies:FindFirstChild("Ice Admiral") or workspace.Enemies["Ice Admiral"].Humanoid.Health <= 0
+                                Remotes.CommF_:InvokeServer("TravelDressrosa")
+                            else
+                                TweenController.Create(CFrame.new(1347.71, 37.38, -1325.65))
+                            end
+                        else
+                            Remotes.CommF_:InvokeServer("TravelDressrosa")
+                        end
+                        -- [ADDED] Check PlaceId thật để xác nhận đã sang Sea 2, timeout 60s tránh treo vĩnh viễn
+                        local waitStart = tick()
+                        repeat
+                            task.wait(1)
+                        until game.PlaceId == 4442272183 or game.PlaceId == 79091703265657
+                           or SeaIndex == 2 or (tick() - waitStart) > 60
+                        _G.SeaTransitionActive = false
+                    end
+                end)
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while task.wait(0.5) do
+            if not Config.AutoSea3 then _G.SeaTransitionActive = false end
+            if SeaIndex == 3 then _G.RipIndraBegun = false end
+            if Config.AutoSea3 then
+                pcall(function()
+                    -- [FIXED] Thiếu "SeaIndex ~= 3" — trước đây vòng lặp này
+                    -- chạy MÃI MÃI kể cả sau khi đã ở Sea 3, tiếp tục gọi
+                    -- BartiloQuestProgress/tween mỗi 0.5s dù đã xong quest,
+                    -- có thể trả giá trị lạ và tween lung tung. AutoSea2 bên
+                    -- trên đã có sẵn check này, AutoSea3 bị thiếu do sót.
+                    if ScriptStorage.PlayerData.Level >= 1500 and SeaIndex ~= 3 then
+                        -- [ADDED] Khóa LevelFarm lại — "bỏ mấy thứ làm dang dở
+                        -- khác" trong lúc đang xử lý quest/di chuyển sang Sea 3
+                        _G.SeaTransitionActive = true
+
+                        local bartiloProgress = Remotes.CommF_:InvokeServer("BartiloQuestProgress", "Bartilo")
+                        if bartiloProgress == 0 then
+                            local questText = game.Players.LocalPlayer.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text
+                            if string.find(questText, "Swan Pirates") and string.find(questText, "50") and game.Players.LocalPlayer.PlayerGui.Main.Quest.Visible then
+                                local swan = workspace.Enemies:FindFirstChild("Swan Pirate")
+                                if swan and swan:FindFirstChild("Humanoid") and swan.Humanoid.Health > 0 then
+                                    CombatController.Attack("Swan Pirate")
+                                else
+                                    TweenController.Create(CFrame.new(1057.93, 137.61, 1242.08))
+                                end
+                            else
+                                TweenController.Create(CFrame.new(-456.29, 73.02, 299.90))
+                            end
+                        elseif bartiloProgress == 1 then
+                            local jeremy = workspace.Enemies:FindFirstChild("Jeremy")
+                            if jeremy and jeremy:FindFirstChild("Humanoid") and jeremy.Humanoid.Health > 0 then
+                                CombatController.Attack("Jeremy")
+                            else
+                                TweenController.Create(CFrame.new(2099.88, 448.93, 648.00))
+                            end
+                        elseif bartiloProgress == 2 then
+                            TweenController.Create(CFrame.new(-1836, 11, 1714))
+                            if CaculateDistance(CFrame.new(-1836, 11, 1714)) < 5 then
+                                local positions = {
+                                    CFrame.new(-1850.49, 13.18, 1750.90),
+                                    CFrame.new(-1858.87, 19.38, 1712.02),
+                                    CFrame.new(-1803.94, 16.58, 1750.90),
+                                    CFrame.new(-1858.56, 16.86, 1724.80),
+                                    CFrame.new(-1869.54, 15.99, 1681.01),
+                                    CFrame.new(-1800.10, 16.50, 1684.52),
+                                    CFrame.new(-1819.26, 14.80, 1717.91),
+                                    CFrame.new(-1813.52, 14.86, 1724.80)
+                                }
+                                for _, pos in ipairs(positions) do
+                                    if not Config.AutoSea3 then break end
+                                    HumanoidRootPart.CFrame = pos
+                                    task.wait(0.1)
+                                end
+                            end
+                        elseif bartiloProgress == 3 then
+                            local unlockables = Remotes.CommF_:InvokeServer("GetUnlockables")
+                            if unlockables.FlamingoAccess == nil then
+                                local inventoryFruits = Remotes.CommF_:InvokeServer("getInventoryFruits")
+                                local fruitStore = {}
+                                for _, v in pairs(inventoryFruits) do
+                                    for i1, v1 in pairs(v) do
+                                        if i1 == "Name" then table.insert(fruitStore, v1) end
+                                    end
+                                end
+                                local fruitPrices = Remotes.CommF_:InvokeServer("GetFruits")
+                                local availableFruits = {}
+                                for _, v in next, fruitPrices do
+                                    if v.Price >= 1000000 then table.insert(availableFruits, v.Name) end
+                                end
+                                for _, fruitName in pairs(availableFruits) do
+                                    for _, storeFruit in pairs(fruitStore) do
+                                        if fruitName == storeFruit and unlockables.FlamingoAccess == nil then
+                                            if not game.Players.LocalPlayer.Backpack:FindFirstChild(fruitName) then
+                                                Remotes.CommF_:InvokeServer("LoadFruit", fruitName)
+                                            else
+                                                Remotes.CommF_:InvokeServer("TalkTrevor", "1")
+                                                Remotes.CommF_:InvokeServer("TalkTrevor", "2")
+                                                Remotes.CommF_:InvokeServer("TalkTrevor", "3")
+                                            end
+                                        end
+                                    end
+                                end
+                                Remotes.CommF_:InvokeServer("TalkTrevor", "1")
+                                Remotes.CommF_:InvokeServer("TalkTrevor", "2")
+                                Remotes.CommF_:InvokeServer("TalkTrevor", "3")
+                            else
+                                local zCheck = Remotes.CommF_:InvokeServer("ZQuestProgress", "Check")
+                                if zCheck == 0 then
+                                    local rip_indra = workspace.Enemies:FindFirstChild("rip_indra")
+                                    if rip_indra and rip_indra:FindFirstChild("Humanoid") and rip_indra.Humanoid.Health > 0 then
+                                        -- [FIXED] Đánh XONG rồi CHỜ nó chết hẳn (giống pattern Ice
+                                        -- Admiral ở AutoSea2 — đã chạy đúng từ trước), thay vì đánh
+                                        -- 1 phát rồi thoát ra chờ vòng poll 0.5s sau mới biết kết quả
+                                        CombatController.Attack("rip_indra")
+                                        repeat
+                                            task.wait()
+                                            CombatController.Attack("rip_indra")
+                                        until not Config.AutoSea3
+                                           or not rip_indra.Parent
+                                           or rip_indra.Humanoid.Health <= 0
+
+                                        -- [ADDED] Vừa xác nhận chết xong → re-check + travel NGAY,
+                                        -- không đợi vòng poll 0.5s tiếp theo (giữ nhất quán với cách
+                                        -- AutoSea2 gọi TravelDressrosa ngay sau khi Ice Admiral chết)
+                                        task.wait(1)
+                                        local zAfterKill = Remotes.CommF_:InvokeServer("ZQuestProgress", "Check")
+                                        if zAfterKill == 1 or zAfterKill == 2 then
+                                            Remotes.CommF_:InvokeServer("TravelZou")
+                                            local waitStart2 = tick()
+                                            repeat
+                                                task.wait(1)
+                                            until game.PlaceId == 7449423635 or game.PlaceId == 100117331123089
+                                               or SeaIndex == 3 or (tick() - waitStart2) > 60
+                                        end
+
+                                    elseif not rip_indra then
+                                        -- [FIXED] CHỈ gọi "Begin" khi rip_indra CHƯA TỪNG spawn —
+                                        -- trước đây branch else này bắt luôn cả trường hợp "vừa giết
+                                        -- xong, xác còn đó Health=0", gọi lại Begin liên tục reset
+                                        -- quest → zCheck không bao giờ lên 1 → không bao giờ travel.
+                                        if not _G.RipIndraBegun then
+                                            Remotes.CommF_:InvokeServer("ZQuestProgress", "Begin")
+                                            _G.RipIndraBegun = true
+                                        end
+                                        TweenController.Create(CFrame.new(2288.80, 15.19, 863.03))
+                                    else
+                                        -- rip_indra tồn tại nhưng Health<=0 (xác vừa chết, server
+                                        -- chưa kịp dọn) → KHÔNG gọi Begin, chỉ đợi rồi để vòng poll
+                                        -- 0.5s tiếp theo tự đọc lại zCheck (server cần chút thời gian)
+                                        task.wait(1)
+                                    end
+                                elseif zCheck == 1 then
+                                    -- [ADDED] Đây là bước TELEPORT SANG PLACE KHÁC thật sự
+                                    -- (Sea 3 = PlaceId khác hẳn, không phải chỉ đổi map trong
+                                    -- cùng server). Gọi xong PHẢI đợi xác nhận qua game.PlaceId
+                                    -- rồi mới coi là xong — không thì code phía dưới (hoặc
+                                    -- LevelFarm) vẫn tưởng đang ở Sea 2, dùng HumanoidRootPart/
+                                    -- workspace CŨ đã bị hủy khi qua place mới → dịch tùm lum.
+                                    Remotes.CommF_:InvokeServer("TravelZou")
+                                    local waitStart = tick()
+                                    repeat
+                                        task.wait(1)
+                                    until game.PlaceId == 7449423635 or game.PlaceId == 100117331123089
+                                       or SeaIndex == 3 or (tick() - waitStart) > 60
+                                else
+                                    local donSwan = workspace.Enemies:FindFirstChild("Don Swan")
+                                    if donSwan and donSwan:FindFirstChild("Humanoid") and donSwan.Humanoid.Health > 0 then
+                                        CombatController.Attack("Don Swan")
+                                    else
+                                        TweenController.Create(CFrame.new(2288.80, 15.19, 863.03))
+                                    end
+                                end
+                            end
+                        end
+                    else
+                        -- [ADDED] Level chưa đủ HOẶC đã ở Sea 3 rồi → không có
+                        -- lý do gì để khóa LevelFarm nữa, trả lại quyền farm bình thường
+                        _G.SeaTransitionActive = false
+                    end
+                end)
+            end
+        end
+    end)
+
+    -- ============================================================
+    -- ANTI LAG / LOW GRAPHICS
+    -- ============================================================
+    if Config.Configuration and Config.Configuration.LowGraphics ~= false then
+        task.spawn(function()
+            pcall(function()
+                local lighting = game:GetService("Lighting")
+                lighting.GlobalShadows = false
+                lighting.FogEnd = 9e9
+                lighting.Brightness = 0
+                for _, v in pairs(lighting:GetDescendants()) do
+                    if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+                        v.Enabled = false
+                    end
+                end
+                local terrain = workspace.Terrain
+                if terrain then
+                    terrain.WaterWaveSize = 0
+                    terrain.WaterWaveSpeed = 0
+                    terrain.WaterReflectance = 0
+                    terrain.WaterTransparency = 0
+                end
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
+                        obj.Lifetime = NumberRange.new(0)
+                    elseif obj:IsA("Fire") or obj:IsA("SpotLight") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+                        obj.Enabled = false
+                    end
+                end
+                if settings and settings().Rendering then
+                    settings().Rendering.QualityLevel = "Level01"
+                    settings().Rendering.GraphicsMode = "NoGraphics"
+                end
+                print("[✅ Anti Lag] Đã áp dụng tối ưu đồ họa!")
+            end)
+        end)
+    end
+
+    -- ============================================================
+    -- VÒNG LẶP CHÍNH
+    -- ============================================================
+    while task.wait() do
+        if Config.Configuration.HopWhenIdle and LastIdling and os.time() - LastIdling > 300.0 then
+            SetTask('MainTask', "Rejoining due idle in 10 min!")
+            task.wait(1)
+            while task.wait() do game:GetService('TeleportService'):Teleport(game.PlaceId) end
+        end
+        if not AnimationDelay or os.time() - AnimationDelay > 60 then
+            AnimationDelay = os.time()
+        end
+        if ScriptStorage.PlayerData.Level and ScriptStorage.PlayerData.Level > 0 then
+            local J, r = xpcall(RefreshTasksData, debug.traceback)
+            if not J then 
+                print('[ Error ]', r)
+                task.wait(1)
+            end
+        else
+            task.wait(1)
+            pcall(RefreshPlayerData)
+        end
+    end
 end
 
+hoangtuveu()
 
--- // UI Large \\ --
+-- ============================================================
+-- IMPORTED UI LAYOUT FROM BLOXKID (FILE 1)
+-- ============================================================
+
+-- HYBRID COMPATIBILITY CONFIG (UI from bloxkid, functions from DynamicIsland)
+getgenv().SettingFarm = getgenv().SettingFarm or { ["Hide UI"] = false }
+
 local Lighting = game:GetService("Lighting")
 
 local blur = Instance.new("BlurEffect")
@@ -1795,8139 +6649,4 @@ TextButton.MouseButton1Down:Connect(
     end  
 )
 
-local function SyncItems()
-    local current = {}
 
-    for _, v in pairs(
-        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
-    ) do
-        if typeof(v) == "table" and v.Name then
-            current[v.Name] = true
-            if not shownItems[v.Name] then
-                local label = Instance.new("TextLabel")
-                label.BackgroundTransparency = 1
-                label.Size = UDim2.new(1, -6, 0, 18)
-                label.TextXAlignment = Enum.TextXAlignment.Center
-                label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold)
-                label.TextSize = 16
-                label.TextColor3 = Color3.fromRGB(255,255,255)
-                label.Text = v.Name
-                label.Parent = TypeAccountScroll
-                shownItems[v.Name] = label
-            end
-        end
-    end
-
-    for name, label in pairs(shownItems) do
-        if not current[name] then
-            label:Destroy()
-            shownItems[name] = nil
-        end
-    end
-
-    TypeAccountScroll.CanvasSize =
-        UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 6)
-end
-
-task.spawn(function()
-    while task.wait(1) do
-        if CoinCard.Enabled then
-            SyncItems()
-        end
-    end
-end)
-
-task.spawn(function()
-    local badgeId = 2125253113
-
-    local ICON_RED   = utf8.char(0x1F534)
-    local ICON_GREEN = utf8.char(0x1F7E2)
-    local ICON_OK    = utf8.char(0x2705)
-    local ICON_X     = utf8.char(0x274C)
-
-    while task.wait(1) do
-        local char = player.Character
-        local backpack = player:FindFirstChild("Backpack")
-        if not char or not backpack then continue end
-
-        local inv = GetInvMap()
-
-        local hasValk = false
-        for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("Accessory") and v.Name:lower():find("valk") then
-                hasValk = true
-                break
-            end
-        end
-        if inv["Valkyrie Helm"] then hasValk = true end
-        ValkyrieHelmLabel.Text = (hasValk and ICON_GREEN or ICON_RED) .. " Valkyrie Helm"
-
-        if inv["Cursed Dual Katana"]
-        or backpack:FindFirstChild("Cursed Dual Katana")
-        or char:FindFirstChild("Cursed Dual Katana") then
-            CursedDualKatanaLabel.Text = ICON_GREEN .. " Cursed Dual Katana"
-        else
-            CursedDualKatanaLabel.Text = ICON_RED .. " Cursed Dual Katana"
-        end
-
-        local ok, response = pcall(function()
-            return ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyGodhuman", true)
-        end)
-
-        if ok and (response == 1 or response == 2) then
-            GodHumanLabel.Text = ICON_GREEN .. " GodHuman"
-        else
-            GodHumanLabel.Text = ICON_RED .. " GodHuman"
-        end
-
-        if inv["Skull Guitar"]
-        or backpack:FindFirstChild("Skull Guitar")
-        or char:FindFirstChild("Skull Guitar") then
-            SkullGuitarLabel.Text = ICON_GREEN .. " Skull Guitar"
-        else
-            SkullGuitarLabel.Text = ICON_RED .. " Skull Guitar"
-        end
-
-        MirrorFractalLabel.Text =
-            (inv["Mirror Fractal"] and ICON_GREEN or ICON_RED) .. " Mirror Fractal"
-
-        local ok2, result = pcall(function()
-            return game:GetService("ReplicatedStorage")
-                .Remotes
-                .CommF_
-                :InvokeServer("CheckTempleDoor")
-        end)
-
-        local isTrue = false
-        if ok2 then
-            if result == true then
-                isTrue = true
-            elseif type(result) == "string" and result:lower() == "true" then
-                isTrue = true
-            end
-        end
-
-        PullLeverLabel.Text = (isTrue and ICON_GREEN or ICON_RED) .. " Pull Lever"
-
-        local level = player.Data.Level.Value
-        local hasBadge = false
-        local s, r = pcall(function()
-            return BadgeService:UserHasBadgeAsync(player.UserId, badgeId)
-        end)
-        if s then hasBadge = r end
-
-        LevelLabel.Text =
-            "Level: " .. level .. "    Third Sea : " .. (hasBadge and ICON_OK or ICON_X)
-
-        FragLabel.Text = "Frag: " .. tostring(player.Data.Fragments.Value)
-        BeliLabel.Text = "Beli: " .. tostring(player.Data.Beli.Value)
-        RaceLabel.Text = "Race: " .. tostring(player.Data.Race.Value)
-    end
-end)
-
-local function SetStatusFarm(text)
-    UnderStatus.Text = "Status Farm: ".. text
-end
-
-local function SetStatus(text)
-    Top2.Text = "Status: ".. text 
-end
-
-SetStatus("Lonely Hub Is Running")
-if PlaceId == 85211729168715 then
-	Old_World = true
-elseif PlaceId == 79091703265657 then
-	New_World = true
-elseif PlaceId == 100117331123089 then
-	Three_World = true
-end
-Level = (Player:WaitForChild("Data")):WaitForChild("Level")
-function CheckLevel2()
-	local L_28_ = {}
-	L_28_[2] = (game:GetService("Players"))["LocalPlayer"]["Data"]["Level"]["Value"]
-	if Old_World then
-		if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 9 or SelectMonster == "" then
-			Ms = "Bandit"
-			NameQuest = "BanditQuest1"
-			QuestLv = 1
-			NameMon = "Bandit"
-			CFrameQ = CFrame["new"](1059.37195, 15.4495068, 1550.4231, .939700544, 0, -0.341998369, 0, 1, 0, .341998369, 0, .939700544)
-			CFrameMon = CFrame["new"](1353.44885, 3.40935516, 1376.92029, .776053488, -6.97791975e-08, .630666852, 6.99138596e-08, 1, 2.4612488e-08, -0.630666852, 2.49917598e-08, .776053488)
-			Next_Level_X = 10
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 10 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 59 then
-			Ms = "Shanda"
-			NameQuest = "SkyExp1Quest"
-			QuestLv = 2
-			NameMon = "Shanda"
-			CFrameQ = CFrame["new"](-7859.09814, 5544.19043, -381.476196)
-			CFrameMon = CFrame["new"](-7904.57373, 5584.37646, -459.62973)
-			Next_Level_X = 75
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 60 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 74 or SelectMonster == "Desert Bandit" then
-			Ms = "Desert Bandit"
-			NameQuest = "DesertQuest"
-			QuestLv = 1
-			NameMon = "Desert Bandit"
-			CFrameQ = CFrame["new"](894.488647, 5.14000702, 4392.43359, .819155693, 0, -0.573571265, 0, 1, 0, .573571265, 0, .819155693)
-			CFrameMon = CFrame["new"](932.788818, 6.8503746, 4488.24609, -0.998625934, 3.08948351e-08, .0524050146, 2.79967303e-08, 1, -5.60361286e-08, -0.0524050146, -5.44919629e-08, -0.998625934)
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 75 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 89 or SelectMonster == "Desert Officer" then
-			Ms = "Desert Officer"
-			NameQuest = "DesertQuest"
-			QuestLv = 2
-			NameMon = "Desert Officer"
-			CFrameQ = CFrame["new"](894.488647, 5.14000702, 4392.43359, .819155693, 0, -0.573571265, 0, 1, 0, .573571265, 0, .819155693)
-			CFrameMon = CFrame["new"](1617.07886, 1.5542295, 4295.54932, -0.997540116, -2.26287735e-08, -0.070099175, -1.69377223e-08, 1, -8.17798806e-08, .070099175, -8.03913949e-08, -0.997540116)
-			Next_Level_X = 90
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 90 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 99 or SelectMonster == "Snow Bandit" then
-			Ms = "Snow Bandit"
-			NameQuest = "SnowQuest"
-			QuestLv = 1
-			NameMon = "Snow Bandit"
-			CFrameQ = CFrame["new"](1389.74451, 86.6520844, -1298.90796, -0.342042685, 0, .939684391, 0, 1, 0, -0.939684391, 0, -0.342042685)
-			CFrameMon = CFrame["new"](1412.92346, 55.3503647, -1260.62036, -0.246266365, -0.0169920288, -0.969053388, .000432241941, .999844253, -0.0176417865, .969202161, -0.00476344163, -0.246220857)
-			if SelectMonster == "Snow Bandit" then
-			else
-				Next_Level_X = 100
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 110 then
-				SelectBoss_P = "Yeti"
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 100 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 119 or SelectMonster == "Snowman" then
-			Next_Level_X = 120
-			Ms = "Snowman"
-			NameQuest = "SnowQuest"
-			QuestLv = 2
-			NameMon = "Snowman"
-			CFrameQ = CFrame["new"](1389.74451, 86.6520844, -1298.90796, -0.342042685, 0, .939684391, 0, 1, 0, -0.939684391, 0, -0.342042685)
-			CFrameMon = CFrame["new"](1376.86401, 97.2779999, -1396.93115, -0.986755967, 7.71178321e-08, -0.162211925, 7.71531674e-08, 1, 6.08143536e-09, .162211925, -6.51427134e-09, -0.986755967)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 110 then
-				SelectBoss_P = "Yeti"
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 120 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 174 or SelectMonster == "Chief Petty Officer" then
-			Ms = "Chief Petty Officer"
-			NameQuest = "MarineQuest2"
-			QuestLv = 1
-			NameMon = "Chief Petty Officer"
-			CFrameQ = CFrame["new"](-5039.58643, 27.3500385, 4324.68018, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-			CFrameMon = CFrame["new"](-4882.8623, 22.6520386, 4255.53516, .273695946, -5.40380647e-08, -0.96181643, 4.37720793e-08, 1, -4.37274998e-08, .96181643, -3.01326679e-08, .273695946)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 130 then
-				SelectBoss_P = "Vice Admiral"
-			end
-			if SelectMonster == "Chief Petty Officer" then
-			else
-				Next_Level_X = 175
-			end
-		elseif SelectMonster == "Sky Bandit" then
-			Ms = "Sky Bandit"
-			NameQuest = "SkyQuest"
-			QuestLv = 1
-			NameMon = "Sky Bandit"
-			CFrameQ = CFrame["new"](-4839.53027, 716.368591, -2619.44165, .866007268, 0, .500031412, 0, 1, 0, -0.500031412, 0, .866007268)
-			CFrameMon = CFrame["new"](-4959.51367, 365.39267, -2974.56812, .964867651, 7.74418396e-08, .262737453, -6.95931988e-08, 1, -3.91783708e-08, -0.262737453, 1.95171506e-08, .964867651)
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 175 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 189 or SelectMonster == "Dark Master" then
-			Ms = "Dark Master"
-			NameQuest = "SkyQuest"
-			QuestLv = 2
-			NameMon = "Dark Master"
-			CFrameQ = CFrame["new"](-4839.53027, 716.368591, -2619.44165, .866007268, 0, .500031412, 0, 1, 0, -0.500031412, 0, .866007268)
-			CFrameMon = CFrame["new"](-5079.98096, 376.477356, -2194.17139, .465965867, -3.69776352e-08, .884802461, 3.40249851e-09, 1, 4.00000886e-08, -0.884802461, -1.56281423e-08, .465965867)
-			if SelectMonster == "Dark Master" then
-			else
-				Next_Level_X = 190
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 190 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 209 or SelectMonster == "Prisoner" then
-			Ms = "Prisoner"
-			QuestLv = 1
-			NameQuest = "PrisonerQuest"
-			NameMon = "Prisoner"
-			CFrameQ = CFrame["new"](5308.93115, 1.65517521, 475.120514, -0.0894274712, -5.00292918e-09, -0.995993316, 1.60817859e-09, 1, -5.16744869e-09, .995993316, -2.06384709e-09, -0.0894274712)
-			CFrameMon = CFrame["new"](5433.39307, 88.678093, 514.986877, .879988372, 0, -0.474995494, 0, 1, 0, .474995494, 0, .879988372)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 220 then
-				SelectBoss_P = "Warden"
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 232 then
-				SelectBoss_P = "Chief Warden"
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 242 then
-				SelectBoss_P = "Thunder God"
-			end
-			if SelectMonster == "Prisoner" then
-			else
-				Next_Level_X = 210
-			end
-			Bypass_TP_Dis = true
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 210 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 249 or SelectMonster == "Dangerous Prisoner" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 220 then
-				SelectBoss_P = "Warden"
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 232 then
-				SelectBoss_P = "Chief Warden"
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 242 then
-				SelectBoss_P = "Thunder God"
-			end
-			Ms = "Dangerous Prisoner"
-			QuestLv = 2
-			NameQuest = "PrisonerQuest"
-			NameMon = "Dangerous Prisoner"
-			CFrameQ = CFrame["new"](5308.93115, 1.65517521, 475.120514, -0.0894274712, -5.00292918e-09, -0.995993316, 1.60817859e-09, 1, -5.16744869e-09, .995993316, -2.06384709e-09, -0.0894274712)
-			CFrameMon = CFrame["new"](5433.39307, 88.678093, 514.986877, .879988372, 0, -0.474995494, 0, 1, 0, .474995494, 0, .879988372)
-			Next_Level_X = 250
-			Bypass_TP_Dis = true
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 250 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 274 or SelectMonster == "Toga Warrior" then
-			Ms = "Toga Warrior"
-			NameQuest = "ColosseumQuest"
-			QuestLv = 1
-			NameMon = "Toga Warrior"
-			CFrameQ = CFrame["new"](-1576.11743, 7.38933945, -2983.30762, .576966345, 1.22114863e-09, .816767931, -3.58496594e-10, 1, -1.24185606e-09, -0.816767931, 4.2370063e-10, .576966345)
-			CFrameMon = CFrame["new"](-1779.97583, 44.6077499, -2736.35474, .984437346, 4.10396339e-08, .175734788, -3.62286876e-08, 1, -3.05844168e-08, -0.175734788, 2.3741821e-08, .984437346)
-			if SelectMonster == "Toga Warrior" then
-			else
-				Next_Level_X = 275
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 275 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 299 or SelectMonster == "Gladiator" then
-			Ms = "Gladiator"
-			NameQuest = "ColosseumQuest"
-			QuestLv = 2
-			NameMon = "Gladiator"
-			CFrameQ = CFrame["new"](-1576.11743, 7.38933945, -2983.30762, .576966345, 1.22114863e-09, .816767931, -3.58496594e-10, 1, -1.24185606e-09, -0.816767931, 4.2370063e-10, .576966345)
-			CFrameMon = CFrame["new"](-1274.75903, 58.1895943, -3188.16309, .464524001, 6.21005611e-08, .885560572, -4.80449414e-09, 1, -6.76054768e-08, -0.885560572, 2.71497012e-08, .464524001)
-			Next_Level_X = 300
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 300 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 324 or SelectMonster == "Military Soldier" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 350 then
-				SelectBoss_P = "Magma Admiral"
-			end
-			Ms = "Military Soldier"
-			NameQuest = "MagmaQuest"
-			QuestLv = 1
-			NameMon = "Military Soldier"
-			CFrameQ = CFrame["new"](-5316.55859, 12.2370615, 8517.2998, .588437557, -1.37880001e-08, -0.808542669, -2.10116209e-08, 1, -3.23446478e-08, .808542669, 3.60215964e-08, .588437557)
-			CFrameMon = CFrame["new"](-5363.01123, 41.5056877, 8548.47266, -0.578253984, -3.29503091e-10, .815856814, 9.11209668e-08, 1, 6.498761e-08, -0.815856814, 1.11920997e-07, -0.578253984)
-			if SelectMonster == "Military Soldier" then
-			else
-				Next_Level_X = 325
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 325 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 374 or SelectMonster == "Military Spy" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 350 then
-				SelectBoss_P = "Magma Admiral"
-			end
-			Ms = "Military Spy"
-			NameQuest = "MagmaQuest"
-			QuestLv = 2
-			NameMon = "Military Spy"
-			CFrameQ = CFrame["new"](-5316.55859, 12.2370615, 8517.2998, .588437557, -1.37880001e-08, -0.808542669, -2.10116209e-08, 1, -3.23446478e-08, .808542669, 3.60215964e-08, .588437557)
-			CFrameMon = CFrame["new"](-5787.99023, 120.864456, 8762.25293, -0.188358366, -1.84706277e-08, .982100308, -1.23782129e-07, 1, -4.93306951e-09, -0.982100308, -1.22495649e-07, -0.188358366)
-			Next_Level_X = 375
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 375 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 399 or SelectMonster == "Fishman Warrior" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 425 then
-				SelectBoss_P = "Fishman Lord"
-			end
-			Ms = "Fishman Warrior"
-			NameQuest = "FishmanQuest"
-			QuestLv = 1
-			NameMon = "Fishman Warrior"
-			CFrameQ = CFrame["new"](61122.5625, 18.4716396, 1568.16504)
-			CFrameMon = CFrame["new"](60946.6094, 48.6735229, 1525.91687, -0.0817126185, 8.90751153e-08, .996655822, 2.00889794e-08, 1, -8.77269599e-08, -0.996655822, 1.28533992e-08, -0.0817126185)
-			if SelectMonster == "Fishman Warrior" then
-			else
-				Next_Level_X = 400
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 400 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 449 or SelectMonster == "Fishman Commando" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 425 then
-				SelectBoss_P = "Fishman Lord"
-			end
-			Ms = "Fishman Commando"
-			NameQuest = "FishmanQuest"
-			QuestLv = 2
-			NameMon = "Fishman Commando"
-			CFrameQ = CFrame["new"](61122.5625, 18.4716396, 1568.16504)
-			CFrameMon = CFrame["new"](61902.7383, 18.4828358, 1478.33936, -0.803795099, 0, -0.594906271, 0, 1, 0, .594906271, 0, -0.803795099)
-			if SelectMonster == "Fishman Commando" then
-			else
-				Next_Level_X = 450
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 450 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 474 or SelectMonster == "God's Guard" then
-			Ms = "God's Guard"
-			NameQuest = "SkyExp1Quest"
-			QuestLv = 1
-			NameMon = "God's Guards"
-			CFrameQ = CFrame["new"](-4721.71436, 845.277161, -1954.20105)
-			CFrameMon = CFrame["new"](-4716.95703, 853.089722, -1933.925427)
-			if SelectMonster == "God's Guard" then
-			else
-				Next_Level_X = 475
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 475 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 524 or SelectMonster == "Shanda" then
-			Ms = "Shanda"
-			NameQuest = "SkyExp1Quest"
-			QuestLv = 2
-			NameMon = "Shandas"
-			CFrameQ = CFrame["new"](-7859.09814, 5544.19043, -381.476196)
-			CFrameMon = CFrame["new"](-7904.57373, 5584.37646, -459.62973)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 500 then
-				SelectBoss_P = "Wysper"
-			end
-			if SelectMonster == "Shanda" then
-			else
-				Next_Level_X = 525
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 525 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 549 or SelectMonster == "Royal Squad" then
-			Ms = "Royal Squad"
-			NameQuest = "SkyExp2Quest"
-			QuestLv = 1
-			NameMon = "Royal Squad"
-			CFrameQ = CFrame["new"](-7906.81592, 5634.6626, -1411.99194, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-			CFrameMon = CFrame["new"](-7555.04199, 5606.90479, -1303.24744, -0.896107852, -9.6057462e-10, -0.443836004, -4.24974544e-09, 1, 6.41599973e-09, .443836004, 7.63560326e-09, -0.896107852)
-			if SelectMonster == "Royal Squad" then
-			else
-				Next_Level_X = 550
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 550 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 624 or SelectMonster == "Royal Soldier" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 575 then
-				SelectBoss_P = "Thunder God"
-			end
-			Ms = "Royal Soldier"
-			NameQuest = "SkyExp2Quest"
-			QuestLv = 2
-			NameMon = "Royal Soldier"
-			CFrameQ = CFrame["new"](-7906.81592, 5634.6626, -1411.99194, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-			CFrameMon = CFrame["new"](-7837.31152, 5649.65186, -1791.08582, -0.716008604, .0104285581, -0.698013008, 5.02521061e-06, .99988848, .0149335321, .69809103, .0106890313, -0.715928733)
-			if SelectMonster == "Royal Soldier" then
-			else
-				Next_Level_X = 625
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 625 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 649 or SelectMonster == "Galley Pirate" then
-			Ms = "Galley Pirate"
-			NameQuest = "FountainQuest"
-			QuestLv = 1
-			NameMon = "Galley Pirate"
-			CFrameQ = CFrame["new"](5259.81982, 37.3500175, 4050.0293, .087131381, 0, .996196866, 0, 1, 0, -0.996196866, 0, .087131381)
-			CFrameMon = CFrame["new"](5569.80518, 38.5269432, 3849.01196, .896460414, 3.98027495e-08, .443124533, -1.34262139e-08, 1, -6.26611296e-08, -0.443124533, 5.02237434e-08, .896460414)
-			if SelectMonster == "Galley Pirate" then
-			else
-				Next_Level_X = 650
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 650 or SelectMonster == "Galley Captain" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 675 then
-				SelectBoss_P = "Cyborg"
-			end
-			Ms = "Galley Captain"
-			NameQuest = "FountainQuest"
-			QuestLv = 2
-			NameMon = "Galley Captain"
-			CFrameQ = CFrame["new"](5259.81982, 37.3500175, 4050.0293, .087131381, 0, .996196866, 0, 1, 0, -0.996196866, 0, .087131381)
-			CFrameMon = CFrame["new"](5782.90186, 94.5326462, 4716.78174, .361808896, -1.24757526e-06, -0.932252586, 2.16989656e-06, 1, -4.96097414e-07, .932252586, -1.84339774e-06, .361808896)
-			Next_Level_X = 9999
-		end
-	end
-	if New_World then
-		if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 700 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 724 or SelectMonster == "Raider" then
-			Ms = "Raider"
-			NameQuest = "Area1Quest"
-			QuestLv = 1
-			NameMon = "Raider"
-			CFrameQ = CFrame["new"](-429.543518, 71.7699966, 1836.18188, -0.22495985, 0, -0.974368095, 0, 1, 0, .974368095, 0, -0.22495985)
-			CFrameMon = CFrame["new"](-737.026123, 10.1748352, 2392.57959, .272128761, 0, -0.962260842, 0, 1, 0, .962260842, 0, .272128761)
-			if SelectMonster == "Raider" then
-			else
-				Next_Level_X = 725
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 725 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 774 or SelectMonster == "Mercenary" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 750 then
-				SelectBoss_P = "Diamond"
-			end
-			Ms = "Mercenary"
-			NameQuest = "Area1Quest"
-			QuestLv = 2
-			NameMon = "Mercenary"
-			CFrameQ = CFrame["new"](-429.543518, 71.7699966, 1836.18188, -0.22495985, 0, -0.974368095, 0, 1, 0, .974368095, 0, -0.22495985)
-			CFrameMon = CFrame["new"](-1022.21271, 72.9855194, 1891.39148, -0.990782857, 0, -0.135460541, 0, 1, 0, .135460541, 0, -0.990782857)
-			if SelectMonster == "Mercenary" then
-			else
-				Next_Level_X = 775
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 775 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 799 or SelectMonster == "Swan Pirate" then
-			Ms = "Swan Pirate"
-			NameQuest = "Area2Quest"
-			QuestLv = 1
-			NameMon = "Swan Pirate"
-			CFrameQ = CFrame["new"](638.43811, 71.769989, 918.282898, .139203906, 0, .99026376, 0, 1, 0, -0.99026376, 0, .139203906)
-			CFrameMon = CFrame["new"](976.467651, 111.174057, 1229.1084, .00852567982, -4.73897828e-08, -0.999963999, 1.12251888e-08, 1, -4.7295778e-08, .999963999, -1.08215579e-08, .00852567982)
-			if SelectMonster == "Swan Pirate" then
-			else
-				Next_Level_X = 800
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 800 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 874 or SelectMonster == "Factory Staff" then
-			Ms = "Factory Staff"
-			NameQuest = "Area2Quest"
-			QuestLv = 2
-			NameMon = "Factory Staff"
-			CFrameQ = CFrame["new"](638.43811, 71.769989, 918.282898, .139203906, 0, .99026376, 0, 1, 0, -0.99026376, 0, .139203906)
-			CFrameMon = CFrame["new"](336.74585, 73.1620483, -224.129272, .993632793, 3.40154607e-08, .112668738, -3.87658332e-08, 1, 3.99718729e-08, -0.112668738, -4.40850592e-08, .993632793)
-			if SelectMonster == "Factory Staff" then
-			else
-				Next_Level_X = 875
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 850 then
-				SelectBoss_P = "Jeremy"
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 875 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 899 or SelectMonster == "Marine Lieutenant" then
-			Ms = "Marine Lieutenant"
-			NameQuest = "MarineQuest3"
-			QuestLv = 1
-			NameMon = "Marine Lieutenant"
-			CFrameQ = CFrame["new"](-2440.79639, 71.7140732, -3216.06812, .866007268, 0, .500031412, 0, 1, 0, -0.500031412, 0, .866007268)
-			CFrameMon = CFrame["new"](-2842.69922, 72.9919434, -2901.90479, -0.762281299, 0, -0.64724648, 0, 1.00000012, 0, .64724648, 0, -0.762281299)
-			if SelectMonster == "Marine Lieutenant" then
-			else
-				Next_Level_X = 900
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 900 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 949 or SelectMonster == "Marine Captain" then
-			Ms = "Marine Captain"
-			NameQuest = "MarineQuest3"
-			QuestLv = 2
-			NameMon = "Marine Captain"
-			CFrameQ = CFrame["new"](-2440.79639, 71.7140732, -3216.06812, .866007268, 0, .500031412, 0, 1, 0, -0.500031412, 0, .866007268)
-			CFrameMon = CFrame["new"](-1814.70313, 72.9919434, -3208.86621, -0.900422215, 7.93464423e-08, -0.435017526, 3.68856199e-08, 1, 1.06050372e-07, .435017526, 7.94441988e-08, -0.900422215)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 925 then
-				SelectBoss_P = "Fajita"
-			end
-			if SelectMonster == "Marine Captain" then
-			else
-				Next_Level_X = 950
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 950 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 974 or SelectMonster == "Zombie" then
-			Ms = "Zombie"
-			NameQuest = "ZombieQuest"
-			QuestLv = 1
-			NameMon = "Zombie"
-			CFrameQ = CFrame["new"](-5497.06152, 47.5923004, -795.237061, -0.29242146, 0, -0.95628953, 0, 1, 0, .95628953, 0, -0.29242146)
-			CFrameMon = CFrame["new"](-5649.23438, 126.0578, -737.773743, .355238914, -8.10359282e-08, .934775114, 1.65461245e-08, 1, 8.04023372e-08, -0.934775114, -1.3095117e-08, .355238914)
-			if SelectMonster == "Zombie" then
-			else
-				Next_Level_X = 975
-			end
-			Bypass_TP_Dis = true
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 975 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 999 or SelectMonster == "Vampire" then
-			Ms = "Vampire"
-			NameQuest = "ZombieQuest"
-			QuestLv = 2
-			NameMon = "Vampire"
-			CFrameQ = CFrame["new"](-5497.06152, 47.5923004, -795.237061, -0.29242146, 0, -0.95628953, 0, 1, 0, .95628953, 0, -0.29242146)
-			CFrameMon = CFrame["new"](-6030.32031, .4377408, -1313.5564, -0.856965423, 3.9138893e-08, -0.515373945, -1.12178942e-08, 1, 9.45958547e-08, .515373945, 8.68467822e-08, -0.856965423)
-			if SelectMonster == "Vampire" then
-			else
-				Next_Level_X = 1000
-			end
-			Bypass_TP_Dis = true
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1000 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1049 or SelectMonster == "Snow Trooper" then
-			Ms = "Snow Trooper"
-			NameQuest = "SnowMountainQuest"
-			QuestLv = 1
-			NameMon = "Snow Trooper"
-			CFrameQ = CFrame["new"](609.858826, 400.119904, -5372.25928, -0.374604106, 0, .92718488, 0, 1, 0, -0.92718488, 0, -0.374604106)
-			CFrameMon = CFrame["new"](621.003418, 391.361053, -5335.43604, .481644779, 0, .876366913, 0, 1, 0, -0.876366913, 0, .481644779)
-			if SelectMonster == "Snow Trooper" then
-			else
-				Next_Level_X = 1050
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1050 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1099 or SelectMonster == "Winter Warrior" then
-			Ms = "Winter Warrior"
-			NameQuest = "SnowMountainQuest"
-			QuestLv = 2
-			NameMon = "Winter Warrior"
-			CFrameQ = CFrame["new"](609.858826, 400.119904, -5372.25928, -0.374604106, 0, .92718488, 0, 1, 0, -0.92718488, 0, -0.374604106)
-			CFrameMon = CFrame["new"](1295.62683, 429.447784, -5087.04492, -0.698032081, -8.28980049e-08, -0.71606636, -1.98835952e-08, 1, -9.63858184e-08, .71606636, -5.30424877e-08, -0.698032081)
-			if SelectMonster == "Winter Warrior" then
-			else
-				Next_Level_X = 1100
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1100 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1124 or SelectMonster == "Lab Subordinate" then
-			Ms = "Lab Subordinate"
-			NameQuest = "IceSideQuest"
-			QuestLv = 1
-			NameMon = "Lab Subordinate"
-			CFrameQ = CFrame["new"](-6064.06885, 15.2422857, -4902.97852, .453972578, 0, -0.891015649, 0, 1, 0, .891015649, 0, .453972578)
-			CFrameMon = CFrame["new"](-5769.2041, 37.9288292, -4468.38721, -0.569419742, -2.49055017e-08, .822046936, -6.96206541e-08, 1, -1.79282633e-08, -0.822046936, -6.74401548e-08, -0.569419742)
-			if SelectMonster == "Lab Subordinate" then
-			else
-				Next_Level_X = 1125
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1125 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1174 or SelectMonster == "Horned Warrior" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1150 then
-				SelectBoss_P = "Smoke Admiral"
-			end
-			Ms = "Horned Warrior"
-			NameQuest = "IceSideQuest"
-			QuestLv = 2
-			NameMon = "Horned Warrior"
-			CFrameQ = CFrame["new"](-6064.06885, 15.2422857, -4902.97852, .453972578, 0, -0.891015649, 0, 1, 0, .891015649, 0, .453972578)
-			CFrameMon = CFrame["new"](-6401.27979, 15.9775667, -5948.24316, .388303697, 0, -0.921531856, 0, 1, 0, .921531856, 0, .388303697)
-			if SelectMonster == "Horned Warrior" then
-			else
-				Next_Level_X = 1175
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1175 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1199 or SelectMonster == "Magma Ninja" then
-			Ms = "Magma Ninja"
-			NameQuest = "FireSideQuest"
-			QuestLv = 1
-			NameMon = "Magma Ninja"
-			CFrameQ = CFrame["new"](-5428.03174, 15.0622921, -5299.43457, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-			CFrameMon = CFrame["new"](-5466.06445, 57.6952019, -5837.42822, -0.988835871, 0, -0.149006829, 0, 1, 0, .149006829, 0, -0.988835871)
-			if SelectMonster == "Magma Ninja" then
-			else
-				Next_Level_X = 1200
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1200 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1249 or SelectMonster == "Lava Pirate" then
-			Ms = "Lava Pirate"
-			NameQuest = "FireSideQuest"
-			QuestLv = 2
-			NameMon = "Lava Pirate"
-			CFrameQ = CFrame["new"](-5431.09473, 15.9868021, -5296.53223, .831796765, 1.15322464e-07, -0.555080295, -1.10814341e-07, 1, 4.17010995e-08, .555080295, 2.68240168e-08, .831796765)
-			CFrameMon = CFrame["new"](-5169.71729, 34.1234779, -4669.73633, -0.196780294, 0, .98044765, 0, 1.00000012, 0, -0.98044765, 0, -0.196780294)
-			if SelectMonster == "Lava Pirate" then
-			else
-				Next_Level_X = 1250
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1250 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1274 or SelectMonster == "Ship Deckhand" then
-			Ms = "Ship Deckhand"
-			NameQuest = "ShipQuest1"
-			QuestLv = 1
-			NameMon = "Ship Deckhand"
-			CFrameQ = CFrame["new"](1037.80127, 125.092171, 32911.6016, -0.244533166, 0, -0.969640911, 0, 1.00000012, 0, .96964103, 0, -0.244533136)
-			CFrameMon = CFrame["new"](1163.80872, 138.288452, 33058.4258, -0.998580813, 5.49076979e-08, -0.0532564968, 5.57436763e-08, 1, -1.42118655e-08, .0532564968, -1.71604082e-08, -0.998580813)
-			if SelectMonster == "Ship Deckhand" then
-			else
-				Next_Level_X = 1275
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1275 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1299 or SelectMonster == "Ship Engineer" then
-			Ms = "Ship Engineer"
-			NameQuest = "ShipQuest1"
-			QuestLv = 2
-			NameMon = "Ship Engineer"
-			CFrameQ = CFrame["new"](1037.80127, 125.092171, 32911.6016, -0.244533166, 0, -0.969640911, 0, 1.00000012, 0, .96964103, 0, -0.244533136)
-			CFrameMon = CFrame["new"](921.30249023438, 125.400390625, 32937.34375)
-			if SelectMonster == "Ship Engineer" then
-			else
-				Next_Level_X = 1300
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1300 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1324 or SelectMonster == "Ship Steward" then
-			Ms = "Ship Steward"
-			NameQuest = "ShipQuest2"
-			QuestLv = 1
-			NameMon = "Ship Steward"
-			CFrameQ = CFrame["new"](968.80957, 125.092171, 33244.125, -0.869560242, 1.51905191e-08, -0.493826836, 1.44108379e-08, 1, 5.38534195e-09, .493826836, -2.43357912e-09, -0.869560242)
-			CFrameMon = CFrame["new"](917.96057128906, 136.89932250977, 33343.4140625)
-			if SelectMonster == "Ship Steward" then
-			else
-				Next_Level_X = 1325
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1325 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1349 or SelectMonster == "Ship Officer" then
-			Ms = "Ship Officer"
-			NameQuest = "ShipQuest2"
-			QuestLv = 2
-			NameMon = "Ship Officer"
-			CFrameQ = CFrame["new"](968.80957, 125.092171, 33244.125, -0.869560242, 1.51905191e-08, -0.493826836, 1.44108379e-08, 1, 5.38534195e-09, .493826836, -2.43357912e-09, -0.869560242)
-			CFrameMon = CFrame["new"](944.44964599609, 181.40081787109, 33278.9453125)
-			if SelectMonster == "Ship Officer" then
-			else
-				Next_Level_X = 1350
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1350 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1374 or SelectMonster == "Arctic Warrior" then
-			Ms = "Arctic Warrior"
-			NameQuest = "FrostQuest"
-			QuestLv = 1
-			NameMon = "Arctic Warrior"
-			CFrameQ = CFrame["new"](5667.6582, 26.7997818, -6486.08984, -0.933587909, 0, -0.358349502, 0, 1, 0, .358349502, 0, -0.933587909)
-			CFrameMon = CFrame["new"](5878.23486, 81.3886948, -6136.35596, -0.451037169, 2.3908234e-07, .892505825, -1.08168464e-07, 1, -3.22542007e-07, -0.892505825, -2.4201924e-07, -0.451037169)
-			if SelectMonster == "Arctic Warrior" then
-			else
-				Next_Level_X = 1375
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1375 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1424 or SelectMonster == "Snow Lurker" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1400 then
-				SelectBoss_P = "Awakened Ice Admiral"
-			end
-			Ms = "Snow Lurker"
-			NameQuest = "FrostQuest"
-			QuestLv = 2
-			NameMon = "Snow Lurker"
-			CFrameQ = CFrame["new"](5667.6582, 26.7997818, -6486.08984, -0.933587909, 0, -0.358349502, 0, 1, 0, .358349502, 0, -0.933587909)
-			CFrameMon = CFrame["new"](5513.36865, 60.546711, -6809.94971, -0.958693981, -1.65617333e-08, .284439981, -4.07668654e-09, 1, 4.44854642e-08, -0.284439981, 4.14883701e-08, -0.958693981)
-			if SelectMonster == "Snow Lurker" then
-			else
-				Next_Level_X = 1450
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1425 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1449 or SelectMonster == "Sea Soldier" then
-			Ms = "Sea Soldier"
-			NameQuest = "ForgottenQuest"
-			QuestLv = 1
-			NameMon = "Sea Soldier"
-			CFrameQ = CFrame["new"](-3054.44458, 235.544281, -10142.8193, .990270376, 0, -0.13915664, 0, 1, 0, .13915664, 0, .990270376)
-			CFrameMon = CFrame["new"](-3115.78223, 63.8785706, -9808.38574, -0.913427353, 3.11199457e-08, .407000452, 7.79564235e-09, 1, -5.89660658e-08, -0.407000452, -5.06883708e-08, -0.913427353)
-			if SelectMonster == "Sea Soldier" then
-			else
-				Next_Level_X = 1450
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1450 or SelectMonster == "Water Fighter" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1475 then
-				SelectBoss_P = "Tide Keeper"
-			end
-			Ms = "Water Fighter"
-			NameQuest = "ForgottenQuest"
-			QuestLv = 2
-			NameMon = "Water Fighter"
-			CFrameQ = CFrame["new"](-3054.44458, 235.544281, -10142.8193, .990270376, 0, -0.13915664, 0, 1, 0, .13915664, 0, .990270376)
-			CFrameMon = CFrame["new"](-3212.99683, 263.809296, -10551.8799, .742111444, -5.59139615e-08, -0.670276582, 1.69155214e-08, 1, -6.46908234e-08, .670276582, 3.66697037e-08, .742111444)
-			if SelectMonster == "Water Fighter" then
-			else
-				Next_Level_X = 9999
-			end
-		end
-	end
-	if Three_World then
-		if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1500 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1524 or SelectMonster == "Pirate Millionaire" then
-			Ms = "Pirate Millionaire"
-			NameQuest = "PiratePortQuest"
-			QuestLv = 1
-			NameMon = "Pirate Millionaire"
-			CFrameQ = CFrame["new"](-290.074677, 42.9034653, 5581.58984, .965929627, 0, -0.258804798, 0, 1, 0, .258804798, 0, .965929627)
-			CFrameMon = CFrame["new"](81.164993286133, 43.755737304688, 5724.7021484375)
-			if SelectMonster == "Pirate Millionaire" then
-			else
-				Next_Level_X = 1525
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1525 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1574 or SelectMonster == "Pistol Billionaire" then
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1550 then
-				SelectBoss_P = "Stone"
-			end
-			Ms = "Pistol Billionaire"
-			NameQuest = "PiratePortQuest"
-			QuestLv = 2
-			NameMon = "Pistol Billionaire"
-			CFrameQ = CFrame["new"](-290.074677, 42.9034653, 5581.58984, .965929627, 0, -0.258804798, 0, 1, 0, .258804798, 0, .965929627)
-			CFrameMon = CFrame["new"](81.164993286133, 43.755737304688, 5724.7021484375)
-			if SelectMonster == "Pistol Billionaire" then
-			else
-				Next_Level_X = 1575
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1575 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1599 or SelectMonster == "Dragon Crew Warrior" then
-			Ms = "Dragon Crew Warrior"
-			NameQuest = "AmazonQuest"
-			QuestLv = 1
-			NameMon = "Dragon Crew Warrior"
-			CFrameQ = CFrame["new"](5832.83594, 51.6806107, -1101.51563, .898790359, 0, -0.438378751, 0, 1, 0, .438378751, 0, .898790359)
-			CFrameMon = CFrame["new"](6241.9951171875, 51.522083282471, -1243.9771728516)
-			if SelectMonster == "Dragon Crew Warrior" then
-			else
-				Next_Level_X = 1600
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1600 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1624 or SelectMonster == "Dragon Crew Archer" then
-			Ms = "Dragon Crew Archer"
-			NameQuest = "AmazonQuest"
-			QuestLv = 2
-			NameMon = "Dragon Crew Archer"
-			CFrameQ = CFrame["new"](5832.83594, 51.6806107, -1101.51563, .898790359, 0, -0.438378751, 0, 1, 0, .438378751, 0, .898790359)
-			CFrameMon = CFrame["new"](6488.9155273438, 383.38375854492, -110.66246032715)
-			if SelectMonster == "Dragon Crew Archer" then
-			else
-				Next_Level_X = 1625
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1625 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1649 or SelectMonster == "Female Islander" then
-			Ms = "Female Islander"
-			NameQuest = "AmazonQuest2"
-			QuestLv = 1
-			NameMon = "Female Islander"
-			CFrameQ = CFrame["new"](5448.86133, 601.516174, 751.130676, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-			CFrameMon = CFrame["new"](4770.4990234375, 758.95520019531, 1069.8680419922)
-			if SelectMonster == "Female Islander" then
-			else
-				Next_Level_X = 1650
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1650 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1699 or SelectMonster == "Giant Islander" then
-			Ms = "Giant Islander"
-			NameQuest = "AmazonQuest2"
-			QuestLv = 2
-			NameMon = "Giant Islander"
-			CFrameQ = CFrame["new"](5448.86133, 601.516174, 751.130676, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-			CFrameMon = CFrame["new"](4530.3540039063, 656.75695800781, -131.60952758789)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1675 then
-				SelectBoss_P = "Island Empress"
-			end
-			if SelectMonster == "Giant Islander" then
-			else
-				Next_Level_X = 1700
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1700 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1774 or SelectMonster == "Marine Commodore" then
-			Ms = "Marine Commodore"
-			NameQuest = "MarineTreeIsland"
-			QuestLv = 1
-			NameMon = "Marine Commodore"
-			CFrameQ = CFrame["new"](2180.54126, 27.8156815, -6741.5498, -0.965929747, 0, .258804798, 0, 1, 0, -0.258804798, 0, -0.965929747)
-			CFrameMon = CFrame["new"](2490.0844726563, 190.4232635498, -7160.0502929688)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1750 then
-				SelectBoss_P = "Kilo Admiral"
-			end
-			if SelectMonster == "Marine Commodore" then
-			else
-				Next_Level_X = 1775
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1775 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1799 or SelectMonster == "Fishman Raider" then
-			Ms = "Fishman Raider"
-			NameQuest = "DeepForestIsland3"
-			QuestLv = 1
-			NameMon = "Fishman Raider"
-			CFrameQ = CFrame["new"](-10581.6563, 330.872955, -8761.18652, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-			CFrameMon = CFrame["new"](-10322.400390625, 390.94473266602, -8580.0908203125)
-			if SelectMonster == "Fishman Raider" then
-			else
-				Next_Level_X = 1800
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1800 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1824 or SelectMonster == "Fishman Captain" then
-			Ms = "Fishman Captain"
-			NameQuest = "DeepForestIsland3"
-			QuestLv = 2
-			NameMon = "Fishman Captain"
-			CFrameQ = CFrame["new"](-10581.6563, 330.872955, -8761.18652, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-			CFrameMon = CFrame["new"](-11194.541992188, 442.02795410156, -8608.806640625)
-			if SelectMonster == "Fishman Captain" then
-			else
-				Next_Level_X = 1825
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1825 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1849 or SelectMonster == "Forest Pirate" then
-			Ms = "Forest Pirate"
-			NameQuest = "DeepForestIsland"
-			QuestLv = 1
-			NameMon = "Forest Pirate"
-			CFrameQ = CFrame["new"](-13234.04, 331.488495, -7625.40137, .707134247, 0, -0.707079291, 0, 1, 0, .707079291, 0, .707134247)
-			CFrameMon = CFrame["new"](-13225.809570313, 428.19387817383, -7753.1245117188)
-			if SelectMonster == "Forest Pirate" then
-			else
-				Next_Level_X = 1850
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1850 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1899 or SelectMonster == "Mythological Pirate" then
-			Ms = "Mythological Pirate"
-			NameQuest = "DeepForestIsland"
-			QuestLv = 2
-			NameMon = "Mythological Pirate"
-			CFrameQ = CFrame["new"](-13234.04, 331.488495, -7625.40137, .707134247, 0, -0.707079291, 0, 1, 0, .707079291, 0, .707134247)
-			CFrameMon = CFrame["new"](-13869.172851563, 564.95251464844, -7084.4135742188)
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1875 then
-				SelectBoss_P = "Captain Elephant"
-			end
-			if SelectMonster == "Mythological Pirate" then
-			else
-				Next_Level_X = 1900
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1900 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1924 or SelectMonster == "Jungle Pirate" then
-			Ms = "Jungle Pirate"
-			NameQuest = "DeepForestIsland2"
-			QuestLv = 1
-			NameMon = "Jungle Pirate"
-			CFrameQ = CFrame["new"](-12680.3818, 389.971039, -9902.01953, -0.0871315002, 0, .996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002)
-			CFrameMon = CFrame["new"](-11982.221679688, 376.32522583008, -10451.415039063)
-			if SelectMonster == "Jungle Pirate" then
-			else
-				Next_Level_X = 1925
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1925 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1974 or SelectMonster == "Musketeer Pirate" then
-			Ms = "Musketeer Pirate"
-			NameQuest = "DeepForestIsland2"
-			QuestLv = 2
-			NameMon = "Musketeer Pirate"
-			CFrameQ = CFrame["new"](-12680.3818, 389.971039, -9902.01953, -0.0871315002, 0, .996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002)
-			CFrameMon = CFrame["new"](-13282.3046875, 496.23684692383, -9565.150390625)
-			if SelectMonster == "Musketeer Pirate" then
-			else
-				Next_Level_X = 1975
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1950 then
-				SelectBoss_P = "Beautiful Pirate"
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 1975 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 1999 or SelectMonster == "Reborn Skeleton" then
-			Ms = "Reborn Skeleton"
-			NameQuest = "HauntedQuest1"
-			QuestLv = 1
-			NameMon = "Reborn Skeleton"
-			CFrameQ = CFrame["new"](-9480.8271484375, 142.13066101074, 5566.0712890625)
-			CFrameMon = CFrame["new"](-8817.880859375, 191.16761779785, 6298.6557617188)
-			if SelectMonster == "Reborn Skeleton" then
-			elseif not LevelMax then
-				Next_Level_X = 2000
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2000 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2024 or SelectMonster == "Living Zombie" then
-			Ms = "Living Zombie"
-			NameQuest = "HauntedQuest1"
-			QuestLv = 2
-			NameMon = "Living Zombie"
-			CFrameQ = CFrame["new"](-9480.8271484375, 142.13066101074, 5566.0712890625)
-			CFrameMon = CFrame["new"](-10125.234375, 183.94705200195, 6242.013671875)
-			if SelectMonster == "Living Zombie" then
-			elseif not LevelMax then
-				Next_Level_X = 2025
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2025 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2049 or SelectMonster == "Demonic Soul" then
-			Ms = "Demonic Soul"
-			NameQuest = "HauntedQuest2"
-			QuestLv = 1
-			NameMon = "Demonic"
-			CFrameQ = CFrame["new"](-9516.9931640625, 178.00651550293, 6078.4653320313)
-			CFrameMon = CFrame["new"](-9712.03125, 204.69589233398, 6193.322265625)
-			if SelectMonster == "Demonic Soul" then
-			else
-				Next_Level_X = 2050
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2050 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2074 or SelectMonster == "Posessed Mummy" then
-			Ms = "Posessed Mummy"
-			NameQuest = "HauntedQuest2"
-			QuestLv = 2
-			NameMon = "Posessed Mummy"
-			CFrameQ = CFrame["new"](-9516.9931640625, 178.00651550293, 6078.4653320313)
-			CFrameMon = CFrame["new"](-9545.7763671875, 69.619895935059, 6339.5615234375)
-			if SelectMonster == "Posessed Mummy" then
-			else
-				Next_Level_X = 2075
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2075 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2099 or SelectMonster == "Peanut Scout" then
-			Ms = "Peanut Scout"
-			NameQuest = "NutsIslandQuest"
-			QuestLv = 1
-			NameMon = "Peanut Scout"
-			CFrameQ = CFrame["new"](-2104.17163, 38.1299706, -10194.418, .758814394, -1.38604395e-09, .651306927, 2.85280208e-08, 1, -3.1108879e-08, -0.651306927, 4.21863646e-08, .758814394)
-			CFrameMon = CFrame["new"](-2098.07544, 192.611862, -10248.8867, .983392298, -9.57031787e-08, .181492642, 8.7276355e-08, 1, 5.44169616e-08, -0.181492642, -3.76732068e-08, .983392298)
-			if SelectMonster == "Peanut Scout" then
-			else
-				Next_Level_X = 2100
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2100 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2124 or SelectMonster == "Peanut President" then
-			Ms = "Peanut President"
-			NameQuest = "NutsIslandQuest"
-			QuestLv = 2
-			NameMon = "Peanut President"
-			CFrameQ = CFrame["new"](-2104.17163, 38.1299706, -10194.418, .758814394, -1.38604395e-09, .651306927, 2.85280208e-08, 1, -3.1108879e-08, -0.651306927, 4.21863646e-08, .758814394)
-			CFrameMon = CFrame["new"](-1876.95959, 192.610947, -10542.2939, .0553516336, -2.83836812e-08, .998466909, -6.89634405e-10, 1, 2.84654931e-08, -0.998466909, -2.26418861e-09, .0553516336)
-			if SelectMonster == "Peanut President" then
-			else
-				Next_Level_X = 2125
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2125 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2149 or SelectMonster == "Ice Cream Chef" then
-			Ms = "Ice Cream Chef"
-			NameQuest = "IceCreamIslandQuest"
-			QuestLv = 1
-			NameMon = "Ice Cream Chef"
-			CFrameQ = CFrame["new"](-820.404358, 65.8453293, -10965.5654, .822534859, 5.24448502e-08, -0.568714678, -2.08336317e-08, 1, 6.20846663e-08, .568714678, -3.92184099e-08, .822534859)
-			CFrameMon = CFrame["new"](-821.614075, 208.39537, -10990.7617, -0.870096624, 3.18909272e-08, .492881238, -1.8357893e-08, 1, -9.71107568e-08, -0.492881238, -9.35439957e-08, -0.870096624)
-			if SelectMonster == "Ice Cream Chef" then
-			else
-				Next_Level_X = 2150
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2150 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2199 or SelectMonster == "Ice Cream Commander" then
-			Ms = "Ice Cream Commander"
-			NameQuest = "IceCreamIslandQuest"
-			QuestLv = 2
-			NameMon = "Ice Cream Commander"
-			CFrameQ = CFrame["new"](-819.376526, 67.4634171, -10967.2832)
-			CFrameMon = CFrame["new"](-610.11669921875, 208.26904296875, -11253.686523438)
-			if SelectMonster == "Ice Cream Commander" then
-			else
-				Next_Level_X = 2200
-			end
-			if game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2175 then
-				SelectBoss_P = "Cake Queen"
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2200 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2224 or SelectMonster == "Cookie Crafter" then
-			Ms = "Cookie Crafter"
-			NameQuest = "CakeQuest1"
-			QuestLv = 1
-			NameMon = "Cookie Crafter"
-			CFrameQ = CFrame["new"](-2020.6068115234, 37.82400894165, -12027.80859375)
-			CFrameMon = CFrame["new"](-2286.6843261719, 146.56562805176, -12226.881835938)
-			if SelectMonster == "Cookie Crafter" then
-			elseif not LevelMax then
-				Next_Level_X = 2225
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2225 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] <= 2249 or SelectMonster == "Cake Guard" then
-			Ms = "Cake Guard"
-			NameQuest = "CakeQuest1"
-			QuestLv = 2
-			NameMon = "Cake Guard"
-			CFrameQ = CFrame["new"](-2020.6068115234, 37.82400894165, -12027.80859375)
-			CFrameMon = CFrame["new"](-1817.9747314453, 209.56327819824, -12288.922851562)
-			if SelectMonster == "Cake Guard" then
-			elseif not LevelMax then
-				Next_Level_X = 2250
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2250 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2300 or SelectMonster == "Baking Staff" then
-			Ms = "Baking Staff"
-			NameQuest = "CakeQuest2"
-			QuestLv = 1
-			NameMon = "Baking Staff"
-			CFrameQ = CFrame["new"](-1928.31763, 37.7296638, -12840.626)
-			CFrameMon = CFrame["new"](-1818.3479003906, 93.412757873535, -12887.66015625)
-			if SelectMonster == "Baking Staff" then
-			elseif not LevelMax then
-				Next_Level_X = 2300
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2300 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2325 or SelectMonster == "Cocoa Warrior" then
-			Ms = "Cocoa Warrior"
-			NameQuest = "ChocQuest1"
-			QuestLv = 1
-			NameMon = "Cocoa Warrior"
-			CFrameQ = CFrame["new"](230.19186401367, 24.734258651733, -12202.657226562)
-			CFrameMon = CFrame["new"](24.617475509644, 24.734342575073, -12227.267578125)
-			if SelectMonster == "Cocoa Warrior" then
-			else
-				Next_Level_X = 2325
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2325 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2350 or SelectMonster == TableConcat({
-			"Chocolate Bar Battle",
-			"r"
-		}) then
-			Ms = TableConcat({
-				"Chocolate Bar Battle",
-				"r"
-			})
-			NameQuest = "ChocQuest1"
-			QuestLv = 2
-			NameMon = TableConcat({
-				"Chocolate Bar Battle";
-				"r"
-			})
-			CFrameQ = CFrame["new"](230.19186401367, 24.734258651733, -12202.657226562)
-			CFrameMon = CFrame["new"](658.22302246094, 24.734258651733, -12541.991210938)
-			if SelectMonster == TableConcat({
-				"Chocolate Bar Battle";
-				"r"
-			}) then
-			else
-				Next_Level_X = 2350
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2350 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2375 or SelectMonster == "Sweet Thief" then
-			Ms = "Sweet Thief"
-			NameQuest = "ChocQuest2"
-			QuestLv = 1
-			NameMon = "Sweet Thief"
-			CFrameQ = CFrame["new"](149.14392089844, 24.793828964233, -12775.41015625)
-			CFrameMon = CFrame["new"](51.611843109131, 24.793809890747, -12574.873046875)
-			if SelectMonster == "Sweet Thief" then
-			else
-				Next_Level_X = 2375
-			end
-			SelectMonster = TableConcat({
-				"Chocolate Bar Battle",
-				"r"
-			})
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2375 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2400 or SelectMonster == "Candy Rebel" then
-			Ms = "Candy Rebel"
-			NameQuest = "ChocQuest2"
-			QuestLv = 2
-			NameMon = "Candy Rebel"
-			CFrameQ = CFrame["new"](149.14392089844, 24.793828964233, -12775.41015625)
-			CFrameMon = CFrame["new"](28.34560585022, 24.793802261353, -12949.502929688)
-			if SelectMonster == "Candy Rebel" then
-			else
-				Next_Level_X = 2400
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2400 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2425 or SelectMonster == "Candy Pirate" then
-			Ms = "Candy Pirate"
-			NameQuest = "CandyQuest1"
-			QuestLv = 1
-			NameMon = "Candy Pirate"
-			CFrameQ = CFrame["new"](-1146.8081054688, 16.10725402832, -14444.353515625)
-			CFrameMon = CFrame["new"](-1333.9425048828, 16.907636642456, -14424.844726562)
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2425 and game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] < 2550 or SelectMonster == "Snow Demon" then
-			Ms = "Snow Demon"
-			NameQuest = "CandyQuest1"
-			QuestLv = 2
-			NameMon = "Snow Demon"
-			CFrameQ = CFrame["new"](-1146.8081054688, 16.10725402832, -14444.353515625)
-			CFrameMon = CFrame["new"](-963.02130126953, 16.107183456421, -14289.576171875)
-			if SelectMonster == "Candy Pirate" then
-			else
-				Next_Level_X = 2551
-			end
-		elseif game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 2550 then
-			local L_29_ = {}
-			Ms = "Baking Staff"
-			NameQuest = "CakeQuest2"
-			QuestLv = 1
-			NameMon = "Baking Staff"
-			CFrameQ = CFrame["new"](-1928.31763, 37.7296638, -12840.626)
-			CFrameMon = CFrame["new"](-1818.3479003906, 93.412757873535, -12887.66015625)
-			L_29_[1] = tostring(string["match"](tostring(game["ReplicatedStorage"]["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner")), "%d+"))
-			if L_29_[1] == "nil" or L_29_[1] == nil then
-				(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner", true)
-				Cake_Prince_S:Set(TableConcat({
-					" Cake Prince : Boss ",
-					"Spawn"
-				}))
-			else
-				Cake_Prince_S:Set(" Cake Prince : " .. L_29_[1])
-			end
-		end
-	end
-end
-FarmUpdate = function()
-	if Old_World and (Level["Value"] >= 1 and Level["Value"] <= 9) then
-		Enemy = "Bandit"
-		NameEnemy = "Bandit"
-		QuestName = "BanditQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](1059.58728, 16.412075, 1549.54443, -0.963007867, 4.12775627e-08, .269473195, 2.39519959e-08, 1, -6.75822349e-08, -0.269473195, -5.86278048e-08, -0.963007867)
-		EnemyPos = CFrame["new"](1175.00793, 43.7162018, 1680.39185, .940636754, 1.67726082e-08, .339414984, -3.54472718e-08, 1, 4.88204712e-08, -0.339414984, -5.79536632e-08, .940636754)
-	elseif Old_World and (Level["Value"] >= 10 and Level["Value"] <= 14) then
-		Enemy = "Monkey"
-		NameEnemy = "Monkey"
-		QuestName = "JungleQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-1598.92285, 36.9012909, 148.748718, -0.969585121, -1.11576668e-07, -0.244754329, -1.2733129e-07, 1, 4.8546088e-08, .244754329, 7.823445e-08, -0.969585121)
-		EnemyPos = CFrame["new"](-1660.75586, 40.1013031, 320.152313, .82476908, -4.88485696e-08, -0.565469682, 5.81200084e-08, 1, -1.61455704e-09, .565469682, -3.15334674e-08, .82476908)
-	elseif Old_World and (Level["Value"] >= 15 and Level["Value"] <= 29) then
-		Enemy = "Gorilla"
-		NameEnemy = "Gorilla"
-		QuestName = "JungleQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-1598.92285, 36.9012909, 148.748718, -0.969585121, -1.11576668e-07, -0.244754329, -1.2733129e-07, 1, 4.8546088e-08, .244754329, 7.823445e-08, -0.969585121)
-		EnemyPos = CFrame["new"](-1196.64343, 7.74201918, -445.539734, -0.919930279, -4.16423696e-08, .392081946, -1.71233108e-08, 1, 6.60324133e-08, -0.392081946, 5.40314744e-08, -0.919930279)
-		if Old_World and (Level["Value"] >= 20 and Level["Value"] <= 29) then
-			Name_Boss = "The Gorilla King"
-			QuestName_Boss = "JungleQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Old_World and (Level["Value"] >= 30 and Level["Value"] <= 39) then
-		Enemy = "Pirate"
-		NameEnemy = "Pirate"
-		QuestName = "BuggyQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-1139.5631103516, 4.7520513534546, 3830.38671875)
-		EnemyPos = CFrame["new"](-1045.9431152344, 64.419502258301, 3930.3020019531)
-	elseif Old_World and (Level["Value"] >= 40 and Level["Value"] <= 59) then
-		Enemy = "Brute"
-		NameEnemy = "Brute"
-		QuestName = "BuggyQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-1139.5631103516, 4.7520513534546, 3830.38671875)
-		EnemyPos = CFrame["new"](-1150.2763671875, 130.60118103027, 4164.9345703125)
-		if Old_World and (Level["Value"] >= 55 and Level["Value"] <= 59) then
-			Name_Boss = "Bobby"
-			QuestName_Boss = "BuggyQuest1"
-			QuestNumber_Boss = 3
-		end
-	elseif Old_World and (Level["Value"] >= 60 and Level["Value"] <= 74) then
-		Enemy = "Desert Bandit"
-		NameEnemy = "Desert Bandit"
-		QuestName = "DesertQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](894.488647, 5.14000702, 4392.43359, .819155693, 0, -0.573571265, 0, 1, 0, .573571265, 0, .819155693)
-		EnemyPos = CFrame["new"](935.8798046975, 6.4486746788025, 4481.5859375)
-	elseif Old_World and (Level["Value"] >= 75 and Level["Value"] <= 89) then
-		Enemy = "Desert Officer"
-		NameEnemy = "Desert Officer"
-		QuestName = "DesertQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](894.488647, 5.14000702, 4392.43359, .819155693, 0, -0.573571265, 0, 1, 0, .573571265, 0, .819155693)
-		EnemyPos = CFrame["new"](1608.2822265625, 8.6142244338989, 4371.0073242188)
-	elseif Old_World and (Level["Value"] >= 90 and Level["Value"] <= 99) then
-		Enemy = "Snow Bandit"
-		NameEnemy = "Snow Bandit"
-		QuestName = "SnowQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](1389.74451, 88.1519318, -1298.90796, -0.342042685, 0, .939684391, 0, 1, 0, -0.939684391, 0, -0.342042685)
-		EnemyPos = CFrame["new"](1354.3479003906, 87.272773742676, -1393.9465332031)
-	elseif Old_World and (Level["Value"] >= 100 and Level["Value"] <= 119) then
-		Enemy = "Snowman"
-		NameEnemy = "Snowman"
-		QuestName = "SnowQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](1389.74451, 88.1519318, -1298.90796, -0.342042685, 0, .939684391, 0, 1, 0, -0.939684391, 0, -0.342042685)
-		EnemyPos = CFrame["new"](1201.6412353516, 144.57958984375, -1550.0670166016)
-		if Old_World and (Level["Value"] >= 110 and Level["Value"] <= 119) then
-			Name_Boss = "Yeti"
-			QuestName_Boss = "SnowQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Old_World and (Level["Value"] >= 120 and Level["Value"] <= 149) then
-		Enemy = "Chief Petty Officer"
-		NameEnemy = "Chief Petty Officer"
-		QuestName = "MarineQuest2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-5039.58643, 27.3500385, 4324.68018, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-4710.3598632812, 112.02615356445, 4584.92578125)
-		if Old_World and (Level["Value"] >= 130 and Level["Value"] <= 149) then
-			Name_Boss = "Vice Admiral"
-			QuestName_Boss = "MarineQuest2"
-			QuestNumber_Boss = 2
-		end
-	elseif Old_World and (Level["Value"] >= 150 and Level["Value"] <= 174) then
-		Enemy = "Sky Bandit"
-		NameEnemy = "Sky Bandit"
-		QuestName = "SkyQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-4838.701171875, 717.66931152344, -2617.8647460938)
-		EnemyPos = CFrame["new"](-4965.37890625, 357.37414550781, -2848.7023925781)
-	elseif Old_World and (Level["Value"] >= 175 and Level["Value"] <= 189) then
-		Enemy = "Dark Master"
-		NameEnemy = "Dark Master"
-		QuestName = "SkyQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-4838.701171875, 717.66931152344, -2617.8647460938)
-		EnemyPos = CFrame["new"](-5224.05859375, 484.44784545898, -2275.9985351562)
-	elseif Old_World and (Level["Value"] >= 190 and Level["Value"] <= 209) then
-		Enemy = "Prisoner"
-		NameEnemy = "Prisoner"
-		QuestName = "PrisonerQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](5309.6474609375, 1.6542626619339, 477.8815612793)
-		EnemyPos = CFrame["new"](5276.5576171875, 87.836639404297, 561.01007080078)
-	elseif Old_World and (Level["Value"] >= 210 and Level["Value"] <= 249) then
-		Enemy = "Dangerous Prisoner"
-		NameEnemy = "Dangerous Prisoner"
-		QuestName = "PrisonerQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](5309.6474609375, 1.6542626619339, 477.8815612793)
-		EnemyPos = CFrame["new"](5276.5576171875, 87.836639404297, 561.01007080078)
-		if Old_World and (Level["Value"] >= 240 and Level["Value"] <= 249) then
-			Name_Boss = "Swan"
-			QuestName_Boss = "ImpelQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Old_World and (Level["Value"] >= 250 and Level["Value"] <= 299) then
-		Enemy = "Toga Warrior"
-		NameEnemy = "Toga Warrior"
-		QuestName = "ColosseumQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-1580.04663, 6.35000277, -2986.47534, -0.515037298, 0, -0.857167721, 0, 1, 0, .857167721, 0, -0.515037298)
-		EnemyPos = CFrame["new"](-1820.21484375, 51.683856964111, -2740.6650390625)
-	elseif Old_World and (Level["Value"] >= 300 and Level["Value"] <= 324) then
-		Enemy = "Military Soldier"
-		NameEnemy = "Military Soldier"
-		QuestName = "MagmaQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-5313.37012, 10.9500084, 8515.29395, -0.499959469, 0, .866048813, 0, 1, 0, -0.866048813, 0, -0.499959469)
-		EnemyPos = CFrame["new"](-5411.1645507812, 11.081554412842, 8454.29296875)
-	elseif Old_World and (Level["Value"] >= 325 and Level["Value"] <= 374) then
-		Enemy = "Military Spy"
-		NameEnemy = "Military Spy"
-		QuestName = "MagmaQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-5313.37012, 10.9500084, 8515.29395, -0.499959469, 0, .866048813, 0, 1, 0, -0.866048813, 0, -0.499959469)
-		EnemyPos = CFrame["new"](-5802.8681640625, 86.262413024902, 8828.859375)
-		if Old_World and (Level["Value"] >= 350 and Level["Value"] <= 374) then
-			Name_Boss = "Magma Admiral"
-			QuestName_Boss = "MagmaQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Old_World and (Level["Value"] >= 375 and Level["Value"] <= 399) then
-		Enemy = "Fishman Warrior"
-		NameEnemy = "Fishman Warrior"
-		QuestName = "FishmanQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](61122.65234375, 18.497442245483, 1569.3997802734)
-		EnemyPos = CFrame["new"](60878.30078125, 18.482830047607, 1543.7574462891)
-		if ((CFrame["new"](61164, 12, 1820))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 2000 then
-			Player["Character"]["HumanoidRootPart"]["CFrame"] = CFrame["new"](61164, 12, 1820)
-		end
-	elseif Old_World and (Level["Value"] >= 400 and Level["Value"] <= 449) then
-		Enemy = "Fishman Commando"
-		NameEnemy = "Fishman Commando"
-		QuestName = "FishmanQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](61122.65234375, 18.497442245483, 1569.3997802734)
-		EnemyPos = CFrame["new"](61922.6328125, 18.482830047607, 1493.9343261719)
-		if Old_World and (Level["Value"] >= 425 and Level["Value"] <= 449) then
-			Name_Boss = "Fishman Lord"
-			QuestName_Boss = "FishmanQuest"
-			QuestNumber_Boss = 3
-		end
-		if ((CFrame["new"](61164, 12, 1820))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 2000 then
-			Player["Character"]["HumanoidRootPart"]["CFrame"] = CFrame["new"](61164, 12, 1820)
-		end
-	elseif Old_World and (Level["Value"] >= 450 and Level["Value"] <= 474) then
-		Enemy = "God's Guard"
-		NameEnemy = "God's Guard"
-		QuestName = "SkyExp1Quest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-4721.88867, 843.874695, -1949.96643, .996191859, 0, -0.0871884301, 0, 1, 0, .0871884301, 0, .996191859)
-		EnemyPos = CFrame["new"](-4710.04296875, 845.27697753906, -1927.3079833984)
-		if ((CFrame["new"](-4721.88867, 843.874695, -1949.96643, .996191859, 0, -0.0871884301, 0, 1, 0, .0871884301, 0, .996191859))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-			ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("requestEntrance", Vector3["new"](-4607.82275, 872.54248, -1667.55688))
-		end
-	elseif Old_World and (Level["Value"] >= 475 and Level["Value"] <= 524) then
-		Enemy = "Shanda"
-		NameEnemy = "Shanda"
-		QuestName = "SkyExp1Quest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-7859.09814, 5544.19043, -381.476196, -0.422592998, 0, .906319618, 0, 1, 0, -0.906319618, 0, -0.422592998)
-		EnemyPos = CFrame["new"](-7678.4897460938, 5566.4038085938, -497.21560668945)
-	elseif Old_World and (Level["Value"] >= 525 and Level["Value"] <= 549) then
-		Enemy = "Royal Squad"
-		NameEnemy = "Royal Squad"
-		QuestName = "SkyExp2Quest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-7906.81592, 5634.6626, -1411.99194, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-7624.2524414062, 5658.1333007812, -1467.3542480469)
-	elseif Old_World and (Level["Value"] >= 550 and Level["Value"] <= 624) then
-		Enemy = "Royal Soldier"
-		NameEnemy = "Royal Soldier"
-		QuestName = "SkyExp2Quest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-7906.81592, 5634.6626, -1411.99194, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-7836.7534179688, 5645.6640625, -1790.6236572266)
-		if Old_World and (Level["Value"] >= 575 and Level["Value"] <= 624) then
-			Name_Boss = "Thunder God"
-			QuestName_Boss = "SkyExp2Quest"
-			QuestNumber_Boss = 3
-		end
-	elseif Old_World and (Level["Value"] >= 625 and Level["Value"] <= 649) then
-		Enemy = "Galley Pirate"
-		NameEnemy = "Galley Pirate"
-		QuestName = "FountainQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](5259.81982, 37.3500175, 4050.0293, .087131381, 0, .996196866, 0, 1, 0, -0.996196866, 0, .087131381)
-		EnemyPos = CFrame["new"](5551.0219726562, 78.901351928711, 3930.4128417969)
-	elseif Old_World and (Level["Value"] >= 650 and Level["Value"] <= 99999) then
-		Enemy = "Galley Captain"
-		NameEnemy = "Galley Captain"
-		QuestName = "FountainQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](5259.81982, 37.3500175, 4050.0293, .087131381, 0, .996196866, 0, 1, 0, -0.996196866, 0, .087131381)
-		EnemyPos = CFrame["new"](5441.9516601562, 42.502059936523, 4950.09375)
-		if Old_World and (Level["Value"] >= 675 and Level["Value"] <= 99999) then
-			Name_Boss = "Cyborg"
-			QuestName_Boss = "FountainQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif New_World and (Level["Value"] >= 700 and Level["Value"] <= 724) then
-		Enemy = "Raider"
-		NameEnemy = "Raider"
-		QuestName = "Area1Quest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-429.543518, 71.7699966, 1836.18188, -0.22495985, 0, -0.974368095, 0, 1, 0, .974368095, 0, -0.22495985)
-		EnemyPos = CFrame["new"](-728.32672119141, 52.779319763184, 2345.7705078125)
-	elseif New_World and (Level["Value"] >= 725 and Level["Value"] <= 774) then
-		Enemy = "Mercenary"
-		NameEnemy = "Mercenary"
-		QuestName = "Area1Quest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-429.543518, 71.7699966, 1836.18188, -0.22495985, 0, -0.974368095, 0, 1, 0, .974368095, 0, -0.22495985)
-		EnemyPos = CFrame["new"](-1004.3244018555, 80.158866882324, 1424.6193847656)
-		if New_World and (Level["Value"] >= 750 and Level["Value"] <= 774) then
-			Name_Boss = "Diamond"
-			QuestName_Boss = "Area1Quest"
-			QuestNumber_Boss = 3
-		end
-	elseif New_World and (Level["Value"] >= 775 and Level["Value"] <= 799) then
-		Enemy = "Swan Pirate"
-		NameEnemy = "Swan Pirate"
-		QuestName = "Area2Quest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](638.43811, 71.769989, 918.282898, .139203906, 0, .99026376, 0, 1, 0, -0.99026376, 0, .139203906)
-		EnemyPos = CFrame["new"](1068.6643066406, 137.61428833008, 1322.1060791016)
-	elseif New_World and (Level["Value"] >= 800 and Level["Value"] <= 874) then
-		Enemy = "Factory Staff"
-		NameEnemy = "Factory Staff"
-		QuestName = "Area2Quest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](632.698608, 73.1055908, 918.666321, -0.0319722369, 8.960749e-10, -0.999488771, 1.3632653e-10, 1, 8.9217234e-10, .999488771, -1.0773209e-10, -0.0319722369)
-		EnemyPos = CFrame["new"](73.078674316406, 81.863441467285, -27.470672607422)
-		if New_World and (Level["Value"] >= 850 and Level["Value"] <= 874) then
-			Name_Boss = "Jeremy"
-			QuestName_Boss = "Area2Quest"
-			QuestNumber_Boss = 3
-		end
-	elseif New_World and (Level["Value"] >= 875 and Level["Value"] <= 899) then
-		Enemy = "Marine Lieutenant"
-		NameEnemy = "Marine Lieutenant"
-		QuestName = "MarineQuest3"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-2440.79639, 71.7140732, -3216.06812, .866007268, 0, .500031412, 0, 1, 0, -0.500031412, 0, .866007268)
-		EnemyPos = CFrame["new"](-2821.3723144531, 75.897277832031, -3070.0891113281)
-	elseif New_World and (Level["Value"] >= 900 and Level["Value"] <= 949) then
-		Enemy = "Marine Captain"
-		NameEnemy = "Marine Captain"
-		QuestName = "MarineQuest3"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-2440.79639, 71.7140732, -3216.06812, .866007268, 0, .500031412, 0, 1, 0, -0.500031412, 0, .866007268)
-		EnemyPos = CFrame["new"](-1861.2310791016, 80.176582336426, -3254.6975097656)
-	elseif New_World and (Level["Value"] >= 950 and Level["Value"] <= 974) then
-		Enemy = "Zombie"
-		NameEnemy = "Zombie"
-		QuestName = "ZombieQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-5497.06152, 47.5923004, -795.237061, -0.29242146, 0, -0.95628953, 0, 1, 0, .95628953, 0, -0.29242146)
-		EnemyPos = CFrame["new"](-5657.7768554688, 78.969734191895, -928.68701171875)
-		if New_World and (Level["Value"] >= 925 and Level["Value"] <= 974) then
-			Name_Boss = "Fajita"
-			QuestName_Boss = "MarineQuest3"
-			QuestNumber_Boss = 3
-		end
-	elseif New_World and (Level["Value"] >= 975 and Level["Value"] <= 999) then
-		Enemy = "Vampire"
-		NameEnemy = "Vampire"
-		QuestName = "ZombieQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-5497.06152, 47.5923004, -795.237061, -0.29242146, 0, -0.95628953, 0, 1, 0, .95628953, 0, -0.29242146)
-		EnemyPos = CFrame["new"](-6037.66796875, 32.184638977051, -1340.6597900391)
-	elseif New_World and (Level["Value"] >= 1000 and Level["Value"] <= 1049) then
-		Enemy = "Snow Trooper"
-		NameEnemy = "Snow Trooper"
-		QuestName = "SnowMountainQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](609.858826, 400.119904, -5372.25928, -0.374604106, 0, .92718488, 0, 1, 0, -0.92718488, 0, -0.374604106)
-		EnemyPos = CFrame["new"](549.14733886719, 427.38705444336, -5563.6987304688)
-	elseif New_World and (Level["Value"] >= 1050 and Level["Value"] <= 1099) then
-		Enemy = "Winter Warrior"
-		NameEnemy = "Winter Warrior"
-		QuestName = "SnowMountainQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](609.858826, 400.119904, -5372.25928, -0.374604106, 0, .92718488, 0, 1, 0, -0.92718488, 0, -0.374604106)
-		EnemyPos = CFrame["new"](1142.7451171875, 475.63980102539, -5199.4165039062)
-	elseif New_World and (Level["Value"] >= 1100 and Level["Value"] <= 1124) then
-		Enemy = "Lab Subordinate"
-		NameEnemy = "Lab Subordinate"
-		QuestName = "IceSideQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-6064.06885, 15.2422857, -4902.97852, .453972578, 0, -0.891015649, 0, 1, 0, .891015649, 0, .453972578)
-		EnemyPos = CFrame["new"](-5707.4716796875, 15.951709747314, -4513.3920898438)
-	elseif New_World and (Level["Value"] >= 1125 and Level["Value"] <= 1174) then
-		Enemy = "Horned Warrior"
-		NameEnemy = "Horned Warrior"
-		QuestName = "IceSideQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-6064.06885, 15.2422857, -4902.97852, .453972578, 0, -0.891015649, 0, 1, 0, .891015649, 0, .453972578)
-		EnemyPos = CFrame["new"](-6341.3666992188, 15.951770782471, -5723.162109375)
-		if New_World and (Level["Value"] >= 1150 and Level["Value"] <= 1174) then
-			Name_Boss = "Smoke Admiral"
-			QuestName_Boss = "IceSideQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif New_World and (Level["Value"] >= 1175 and Level["Value"] <= 1199) then
-		Enemy = "Magma Ninja"
-		NameEnemy = "Magma Ninja"
-		QuestName = "FireSideQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-5428.03174, 15.0622921, -5299.43457, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-		EnemyPos = CFrame["new"](-5449.6728515625, 76.658744812012, -5808.2006835938)
-	elseif New_World and (Level["Value"] >= 1200 and Level["Value"] <= 1249) then
-		Enemy = "Lava Pirate"
-		NameEnemy = "Lava Pirate"
-		QuestName = "FireSideQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-5428.03174, 15.0622921, -5299.43457, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-		EnemyPos = CFrame["new"](-5213.3315429688, 49.737880706787, -4701.451171875)
-	elseif New_World and (Level["Value"] >= 1250 and Level["Value"] <= 1274) then
-		Enemy = "Ship Deckhand"
-		NameEnemy = "Ship Deckhand"
-		QuestName = "ShipQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](1037.80127, 125.092171, 32911.6016)
-		EnemyPos = CFrame["new"](1212.0111083984, 150.79205322266, 33059.24609375)
-		if ((CFrame["new"](1212.0111083984, 150.79205322266, 33059.24609375))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 5000 then
-			((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", Vector3["new"](923.21301269531, 126.9759979248, 32852.83203125))
-		end
-	elseif New_World and (Level["Value"] >= 1275 and Level["Value"] <= 1299) then
-		Enemy = "Ship Engineer"
-		NameEnemy = "Ship Engineer"
-		QuestName = "ShipQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](1037.80127, 125.092171, 32911.6016)
-		EnemyPos = CFrame["new"](919.47863769531, 43.544013977051, 32779.96875)
-		if ((CFrame["new"](1212.0111083984, 150.79205322266, 33059.24609375))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 5000 then
-			((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", Vector3["new"](923.21301269531, 126.9759979248, 32852.83203125))
-		end
-	elseif New_World and (Level["Value"] >= 1300 and Level["Value"] <= 1324) then
-		Enemy = "Ship Steward"
-		NameEnemy = "Ship Steward"
-		QuestName = "ShipQuest2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](968.80957, 125.092171, 33244.125)
-		EnemyPos = CFrame["new"](919.43853759766, 129.55599975586, 33436.03515625)
-		if ((CFrame["new"](1212.0111083984, 150.79205322266, 33059.24609375))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 5000 then
-			((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", Vector3["new"](923.21301269531, 126.9759979248, 32852.83203125))
-		end
-	elseif New_World and (Level["Value"] >= 1325 and Level["Value"] <= 1349) then
-		Enemy = "Ship Officer"
-		NameEnemy = "Ship Officer"
-		QuestName = "ShipQuest2"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](968.80957, 125.092171, 33244.125)
-		EnemyPos = CFrame["new"](1036.0179443359, 181.4390411377, 33315.7265625)
-		if ((CFrame["new"](1212.0111083984, 150.79205322266, 33059.24609375))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 5000 then
-			((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", Vector3["new"](923.21301269531, 126.9759979248, 32852.83203125))
-		end
-	elseif New_World and (Level["Value"] >= 1350 and Level["Value"] <= 1374) then
-		Enemy = "Arctic Warrior"
-		NameEnemy = "Arctic Warrior"
-		QuestName = "FrostQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](5667.6582, 26.7997818, -6486.08984, -0.933587909, 0, -0.358349502, 0, 1, 0, .358349502, 0, -0.933587909)
-		EnemyPos = CFrame["new"](5966.24609375, 62.970020294189, -6179.3828125)
-	elseif New_World and (Level["Value"] >= 1375 and Level["Value"] <= 1424) then
-		Enemy = "Snow Lurker"
-		NameEnemy = "Snow Lurker"
-		QuestName = "FrostQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](5667.6582, 26.7997818, -6486.08984, -0.933587909, 0, -0.358349502, 0, 1, 0, .358349502, 0, -0.933587909)
-		EnemyPos = CFrame["new"](5407.0737304688, 69.194374084473, -6880.8803710938)
-		if New_World and (Level["Value"] >= 1400 and Level["Value"] <= 1424) then
-			Name_Boss = "Awakened Ice Admiral"
-			QuestName_Boss = "FrostQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif New_World and (Level["Value"] >= 1425 and Level["Value"] <= 1449) then
-		Enemy = "Sea Soldier"
-		NameEnemy = "Sea Soldier"
-		QuestName = "ForgottenQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-3055, 240, -10145)
-		EnemyPos = CFrame["new"](-3433, 26, -9784)
-	elseif New_World and (Level["Value"] >= 1450 and Level["Value"] <= 999999) then
-		Enemy = "Water Fighter"
-		NameEnemy = "Water Fighter"
-		QuestName = "ForgottenQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-3054.53, 239.96, -10144.42)
-		EnemyPos = CFrame["new"](-3360.23, 284.21, -10533.07)
-		if New_World and (Level["Value"] >= 1475 and Level["Value"] <= 1499) then
-			Name_Boss = "Tide Keeper"
-			QuestName_Boss = "ForgottenQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 1500 and Level["Value"] <= 1524) then
-		Enemy = "Pirate Millionaire"
-		NameEnemy = "Pirate Millionaire"
-		QuestName = "PiratePortQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-449.15930175781, 108.61765289307, 5948.0014648438)
-		EnemyPos = CFrame["new"](-245.99638366699, 47.30615234375, 5584.1005859375)
-	elseif Three_World and (Level["Value"] >= 1525 and Level["Value"] <= 1574) then
-		Enemy = "Pistol Billionaire"
-		NameEnemy = "Pistol Billionaire"
-		QuestName = "PiratePortQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-449.15930175781, 108.61765289307, 5948.0014648438)
-		EnemyPos = CFrame["new"](-187.33015441895, 86.239875793457, 6013.513671875)
-		if Three_World and (Level["Value"] >= 1550 and Level["Value"] <= 1574) then
-			Name_Boss = "Stone"
-			QuestName_Boss = "PiratePortQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 1575 and Level["Value"] <= 1599) then
-		Enemy = "Dragon Crew Warrior"
-		NameEnemy = "Dragon Crew Warrior"
-		QuestName = "DragonCrewQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](6737.7768554688, 127.42920684814, -713.23126220703)
-		EnemyPos = CFrame["new"](6141.140625, 51.351364135742, -1340.7385253906)
-	elseif Three_World and (Level["Value"] >= 1600 and Level["Value"] <= 1624) then
-		Enemy = "Dragon Crew Archer"
-		NameEnemy = "Dragon Crew Archer"
-		QuestName = "DragonCrewQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](6737.7768554688, 127.42920684814, -713.23126220703)
-		EnemyPos = CFrame["new"](6616.4174804688, 441.76705932617, 446.04699707031)
-	elseif Three_World and (Level["Value"] >= 1625 and Level["Value"] <= 1649) then
-		Enemy = "Hydra Enforcer"
-		NameEnemy = "Hydra Enforcer"
-		QuestName = "VenomCrewQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](5212.94140625, 1004.1171875, 755.66571044922)
-		EnemyPos = CFrame["new"](4685.2583007812, 735.80780029297, 815.34259033203)
-	elseif Three_World and (Level["Value"] >= 1650 and Level["Value"] <= 1699) then
-		Enemy = "Venomous Assailant"
-		NameEnemy = "Venomous Assailant"
-		QuestName = "VenomCrewQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](5212.94140625, 1004.1171875, 755.66571044922)
-		EnemyPos = CFrame["new"](4729.0942382812, 590.43676757812, -36.976276397705)
-		if Three_World and (Level["Value"] >= 1675 and Level["Value"] <= 1699) then
-			Name_Boss = "Hydra Leader"
-			QuestName_Boss = "VenomCrewQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 1700 and Level["Value"] <= 1724) then
-		Enemy = "Marine Commodore"
-		NameEnemy = "Marine Commodore"
-		QuestName = "MarineTreeIsland"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](2484.0673828125, 74.282150268555, -6786.64453125)
-		EnemyPos = CFrame["new"](2286.0078125, 73.133918762207, -7159.8090820312)
-	elseif Three_World and (Level["Value"] >= 1725 and Level["Value"] <= 1774) then
-		Enemy = "Marine Rear Admiral"
-		NameEnemy = "Marine Rear Admiral"
-		QuestName = "MarineTreeIsland"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](2484.0673828125, 74.282150268555, -6786.64453125)
-		EnemyPos = CFrame["new"](3656.7736816406, 160.52406311035, -7001.5986328125)
-		if Three_World and (Level["Value"] >= 1750 and Level["Value"] <= 1774) then
-			Name_Boss = "Kilo Admiral"
-			QuestName_Boss = "MarineTreeIsland"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 1775 and Level["Value"] <= 1799) then
-		Enemy = "Fishman Raider"
-		NameEnemy = "Fishman Raider"
-		QuestName = "DeepForestIsland3"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-10581.6563, 330.872955, -8761.18652, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-		EnemyPos = CFrame["new"](-10407.526367188, 331.76263427734, -8368.5166015625)
-	elseif Three_World and (Level["Value"] >= 1800 and Level["Value"] <= 1824) then
-		Enemy = "Fishman Captain"
-		NameEnemy = "Fishman Captain"
-		QuestName = "DeepForestIsland3"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-10581.6563, 330.872955, -8761.18652, -0.882952213, 0, .469463557, 0, 1, 0, -0.469463557, 0, -0.882952213)
-		EnemyPos = CFrame["new"](-10994.701171875, 352.38140869141, -9002.1103515625)
-	elseif Three_World and (Level["Value"] >= 1825 and Level["Value"] <= 1849) then
-		Enemy = "Forest Pirate"
-		NameEnemy = "Forest Pirate"
-		QuestName = "DeepForestIsland"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-13234.04, 331.488495, -7625.40137, .707134247, 0, -0.707079291, 0, 1, 0, .707079291, 0, .707134247)
-		EnemyPos = CFrame["new"](-13274.478515625, 332.37814331055, -7769.5805664062)
-	elseif Three_World and (Level["Value"] >= 1850 and Level["Value"] <= 1899) then
-		Enemy = "Mythological Pirate"
-		NameEnemy = "Mythological Pirate"
-		QuestName = "DeepForestIsland"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-13234.04, 331.488495, -7625.40137, .707134247, 0, -0.707079291, 0, 1, 0, .707079291, 0, .707134247)
-		EnemyPos = CFrame["new"](-13680.607421875, 501.08154296875, -6991.189453125)
-		if Three_World and (Level["Value"] >= 1875 and Level["Value"] <= 1899) then
-			Name_Boss = "Captain Elephant"
-			QuestName_Boss = "DeepForestIsland"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 1900 and Level["Value"] <= 1924) then
-		Enemy = "Jungle Pirate"
-		NameEnemy = "Jungle Pirate"
-		QuestName = "DeepForestIsland2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-12680.3818, 389.971039, -9902.01953, -0.0871315002, 0, .996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002)
-		EnemyPos = CFrame["new"](-12256.16015625, 331.73828125, -10485.836914062)
-	elseif Three_World and (Level["Value"] >= 1924 and Level["Value"] <= 1974) then
-		Enemy = "Musketeer Pirate"
-		NameEnemy = "Musketeer Pirate"
-		QuestName = "DeepForestIsland2"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-12680.3818, 389.971039, -9902.01953, -0.0871315002, 0, .996196866, 0, 1, 0, -0.996196866, 0, -0.0871315002)
-		EnemyPos = CFrame["new"](-13457.904296875, 391.54565429688, -9859.177734375)
-		if Three_World and (Level["Value"] >= 1950 and Level["Value"] <= 1974) then
-			Name_Boss = "Beautiful Pirate"
-			QuestName_Boss = "DeepForestIsland2"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 1974 and Level["Value"] <= 1999) then
-		Enemy = "Reborn Skeleton"
-		NameEnemy = "Reborn Skeleton"
-		QuestName = "HauntedQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-9479.2168, 141.215088, 5566.09277, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-		EnemyPos = CFrame["new"](-8763.7236328125, 165.72299194336, 6159.8618164062)
-	elseif Three_World and (Level["Value"] >= 2000 and Level["Value"] <= 2024) then
-		Enemy = "Living Zombie"
-		NameEnemy = "Living Zombie"
-		QuestName = "HauntedQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-9479.2168, 141.215088, 5566.09277, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-		EnemyPos = CFrame["new"](-10144.131835938, 138.6266784668, 5838.0888671875)
-	elseif Three_World and (Level["Value"] >= 2025 and Level["Value"] <= 2049) then
-		Enemy = "Demonic Soul"
-		NameEnemy = "Demonic Soul"
-		QuestName = "HauntedQuest2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-9516.99316, 172.017181, 6078.46533, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-9505.8720703125, 172.10482788086, 6158.9931640625)
-	elseif Three_World and (Level["Value"] >= 2050 and Level["Value"] <= 2074) then
-		Enemy = "Posessed Mummy"
-		NameEnemy = "Posessed Mummy"
-		QuestName = "HauntedQuest2"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-9516.99316, 172.017181, 6078.46533, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-9582.0224609375, 6.2515273094177, 6205.478515625)
-	elseif Three_World and (Level["Value"] >= 2075 and Level["Value"] <= 2099) then
-		Enemy = "Peanut Scout"
-		NameEnemy = "Peanut Scout"
-		QuestName = "NutsIslandQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-2104.3908691406, 38.104167938232, -10194.21875, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-2143.2419433594, 47.721984863281, -10029.995117188)
-	elseif Three_World and (Level["Value"] >= 2100 and Level["Value"] <= 2124) then
-		Enemy = "Peanut President"
-		NameEnemy = "Peanut President"
-		QuestName = "NutsIslandQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-2104.3908691406, 38.104167938232, -10194.21875, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-1859.3540039062, 38.103168487549, -10422.4296875)
-	elseif Three_World and (Level["Value"] >= 2125 and Level["Value"] <= 2149) then
-		Enemy = "Ice Cream Chef"
-		NameEnemy = "Ice Cream Chef"
-		QuestName = "IceCreamIslandQuest"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-820.64825439453, 65.819526672363, -10965.795898438, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-872.24658203125, 65.81957244873, -10919.95703125)
-	elseif Three_World and (Level["Value"] >= 2150 and Level["Value"] <= 2199) then
-		Enemy = "Ice Cream Commander"
-		NameEnemy = "Ice Cream Commander"
-		QuestName = "IceCreamIslandQuest"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-820.64825439453, 65.819526672363, -10965.795898438, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-		EnemyPos = CFrame["new"](-558.06103515625, 112.04895782471, -11290.774414063)
-		if Three_World and (Level["Value"] >= 2175 and Level["Value"] <= 2199) then
-			Name_Boss = "Cake Queen"
-			QuestName_Boss = "IceCreamIslandQuest"
-			QuestNumber_Boss = 3
-		end
-	elseif Three_World and (Level["Value"] >= 2200 and Level["Value"] <= 2224) then
-		Enemy = "Cookie Crafter"
-		NameEnemy = "Cookie Crafter"
-		QuestName = "CakeQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-2021.32007, 37.7982254, -12028.7295, .957576931, -8.8030205e-08, .288177818, 6.930119e-08, 1, 7.519312e-08, -0.288177818, -5.2032135e-08, .957576931)
-		EnemyPos = CFrame["new"](-2374.13671875, 37.798263549805, -12125.30859375)
-	elseif Three_World and (Level["Value"] >= 2225 and Level["Value"] <= 2249) then
-		Enemy = "Cake Guard"
-		NameEnemy = "Cake Guard"
-		QuestName = "CakeQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-2021.32007, 37.7982254, -12028.7295, .957576931, -8.8030205e-08, .288177818, 6.930119e-08, 1, 7.519312e-08, -0.288177818, -5.2032135e-08, .957576931)
-		EnemyPos = CFrame["new"](-1598.3070068359, 43.773197174072, -12244.581054688)
-	elseif Three_World and (Level["Value"] >= 2250 and Level["Value"] <= 2274) then
-		Enemy = "Baking Staff"
-		NameEnemy = "Baking Staff"
-		QuestName = "CakeQuest2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-1927.91602, 37.7981339, -12842.5391, -0.96804446, 4.2214214e-08, .250778586, 4.7491106e-08, 1, 1.4990471e-08, -0.250778586, 2.6421194e-08, -0.96804446)
-		EnemyPos = CFrame["new"](-1887.8099365234, 77.618507385254, -12998.350585938)
-	elseif Three_World and (Level["Value"] >= 2275 and Level["Value"] <= 2299) then
-		Enemy = "Head Baker"
-		NameEnemy = "Head Baker"
-		QuestName = "CakeQuest2"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-1927.91602, 37.7981339, -12842.5391, -0.96804446, 4.2214214e-08, .250778586, 4.7491106e-08, 1, 1.4990471e-08, -0.250778586, 2.6421194e-08, -0.96804446)
-		EnemyPos = CFrame["new"](-2216.1882324219, 82.884521484375, -12869.293945312)
-	elseif Three_World and (Level["Value"] >= 2300 and Level["Value"] <= 2324) then
-		Enemy = "Cocoa Warrior"
-		NameEnemy = "Cocoa Warrior"
-		QuestName = "ChocQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](233.22836303711, 29.876001358032, -12201.233398438)
-		EnemyPos = CFrame["new"](-21.553283691406, 80.574996948242, -12352.387695312)
-	elseif Three_World and (Level["Value"] >= 2325 and Level["Value"] <= 2349) then
-		Enemy = TableConcat({
-			"Chocolate Bar Battle";
-			"r"
-		})
-		NameEnemy = TableConcat({
-			"Chocolate Bar Battle",
-			"r"
-		})
-		QuestName = "ChocQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](233.22836303711, 29.876001358032, -12201.233398438)
-		EnemyPos = CFrame["new"](582.59057617188, 77.188095092773, -12463.162109375)
-	elseif Three_World and (Level["Value"] >= 2350 and Level["Value"] <= 2374) then
-		Enemy = "Sweet Thief"
-		NameEnemy = "Sweet Thief"
-		QuestName = "ChocQuest2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](150.50663757324, 30.693693161011, -12774.502929688)
-		EnemyPos = CFrame["new"](165.1884765625, 76.058853149414, -12600.836914062)
-	elseif Three_World and (Level["Value"] >= 2375 and Level["Value"] <= 2399) then
-		Enemy = "Candy Rebel"
-		NameEnemy = "Candy Rebel"
-		QuestName = "ChocQuest2"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](150.50663757324, 30.693693161011, -12774.502929688)
-		EnemyPos = CFrame["new"](134.86563110352, 77.247680664062, -12876.547851562)
-	elseif Three_World and (Level["Value"] >= 2400 and Level["Value"] <= 2424) then
-		Enemy = "Candy Pirate"
-		NameEnemy = "Candy Pirate"
-		QuestName = "CandyQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-1167, 60, -14491)
-		EnemyPos = CFrame["new"](-1310.5003662109, 26.016523361206, -14562.404296875)
-	elseif Three_World and (Level["Value"] >= 2425 and Level["Value"] <= 2449) then
-		Enemy = "Snow Demon"
-		NameEnemy = "Snow Demon"
-		QuestName = "CandyQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-1167, 60, -14491)
-		EnemyPos = CFrame["new"](-880.20062255859, 71.247764587402, -14538.609375)
-	elseif Three_World and (Level["Value"] >= 2450 and Level["Value"] <= 2474) then
-		Enemy = "Isle Outlaw"
-		NameEnemy = "Isle Outlaw"
-		QuestName = "TikiQuest1"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-16547.748046875, 61.135334014893, -173.41360473633)
-		EnemyPos = CFrame["new"](-16442.814453125, 116.13899993896, -264.46377563477)
-	elseif Three_World and (Level["Value"] >= 2475 and Level["Value"] <= 2499) then
-		Enemy = "Island Boy"
-		NameEnemy = "Island Boy"
-		QuestName = "TikiQuest1"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-16547.748046875, 61.135334014893, -173.41360473633)
-		EnemyPos = CFrame["new"](-16901.26171875, 84.067565917969, -192.88906860352)
-	elseif Three_World and (Level["Value"] >= 2500 and Level["Value"] <= 2524) then
-		Enemy = "Sun-kissed Warrior"
-		NameEnemy = "Sun"
-		New = "Sun"
-		QuestName = "TikiQuest2"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-16539.078125, 55.686328887939, 1051.5738525391)
-		EnemyPos = CFrame["new"](-16051.969726562, 54.797149658203, 1084.67578125)
-	elseif Three_World and (Level["Value"] >= 2525 and Level["Value"] <= 2549) then
-		Enemy = "Isle Champion"
-		NameEnemy = "Isle Champion"
-		QuestName = "TikiQuest2"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-16539.078125, 55.686328887939, 1051.5738525391)
-		EnemyPos = CFrame["new"](-16619.37109375, 129.98481750488, 1071.2355957031)
-	elseif Three_World and (Level["Value"] >= 2550 and Level["Value"] <= 2574) then
-		Enemy = "Serpent Hunter"
-		NameEnemy = "Serpent Hunter"
-		QuestName = "TikiQuest3"
-		QuestNumber = 1
-		QuestPos = CFrame["new"](-16666.5703125, 105.29138183594, 1576.6925048828)
-		EnemyPos = CFrame["new"](-16474.5703125, 124.32273864746, 1619.248046875)
-	elseif Three_World and (Level["Value"] >= 2575 and Level["Value"] <= 2599) then
-		Enemy = "Skull Slayer"
-		NameEnemy = "Skull Slayer"
-		QuestName = "TikiQuest3"
-		QuestNumber = 2
-		QuestPos = CFrame["new"](-16666.5703125, 105.29138183594, 1576.6925048828)
-		EnemyPos = CFrame["new"](-16778.7852, 232.283752, 1442.08325, -0.992449045, -5.54140511e-10, -0.12265785, -2.84580609e-10, 1, -2.21517649e-09, .12265785, -2.16354379e-09, -0.992449045)
-    elseif Three_World and (Level["Value"] >= 2600 and Level["Value"] <= 2624) then
-        Enemy = "Reef Bandit"
-        NameEnemy = "Reef Bandit"
-        QuestName = "SubmergedQuest1"
-        QuestNumber = 1
-        QuestPos = CFrame.new(10780.739, -2088.410, 9260.411)
-        EnemyPos = CFrame.new(10899.859, -2145.235, 9279.294)
-
-    elseif Three_World and (Level["Value"] >= 2625 and Level["Value"] <= 2649) then
-        Enemy = "Coral Pirate"
-        NameEnemy = "Coral Pirate"
-        QuestName = "SubmergedQuest1"
-        QuestNumber = 2
-        QuestPos = CFrame.new(10780.739, -2088.410, 9260.411)
-        EnemyPos = CFrame.new(10824.544, -2087.295, 9357.231)
-    
-    elseif Three_World and (Level["Value"] >= 2650 and Level["Value"] <= 2674) then
-        Enemy = "Sea Chanter"
-        NameEnemy = "Sea Chanter"
-        QuestName = "SubmergedQuest2"
-        QuestNumber = 1
-        QuestPos = CFrame.new(10883.599, -2086.885, 10034.020)
-        EnemyPos = CFrame.new(10786.387, -2087.373, 10105.262)
-    
-    elseif Three_World and (Level["Value"] >= 2675 and Level["Value"] <= 2699) then
-        Enemy = "Ocean Prophet"
-        NameEnemy = "Ocean Prophet"
-        QuestName = "SubmergedQuest2"
-        QuestNumber = 2
-        QuestPos = CFrame.new(10883.599, -2086.885, 10034.020)
-        EnemyPos = CFrame.new(11003.326, -2007.026, 10225.063)
-    
-    elseif Three_World and (Level["Value"] >= 2700 and Level["Value"] <= 2724) then
-        Enemy = "High Disciple"
-        NameEnemy = "High Disciple"
-        QuestName = "SubmergedQuest3"
-        QuestNumber = 1
-        QuestPos = CFrame.new(9638, -1993, 9615)
-        EnemyPos = CFrame.new(9818.401, -1962.396, 9810.835)
-    
-    elseif Three_World and (Level["Value"] >= 2725 and Level["Value"] <= 2800) then
-        Enemy = "Grand Devotee"
-        NameEnemy = "Grand Devotee"
-        QuestName = "SubmergedQuest3"
-        QuestNumber = 2
-        QuestPos = CFrame.new(9638, -1993, 9615)
-        EnemyPos = CFrame.new(9653.319, -1928.222, 9914.895)
-	end
-end
-function TPZ(L_30_arg0)
-	local L_31_ = {}
-	L_31_[2] = L_30_arg0
-	L_31_[1] = (L_31_[2]["Position"] - game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"]["Position"])["Magnitude"]
-	if L_31_[1] < 100 then
-		L_31_[4] = 50
-	elseif L_31_[1] < 400 then
-		L_31_[4] = 400
-	elseif L_31_[1] < 1000 then
-		L_31_[4] = 300
-	elseif L_31_[1] < 1500 then
-		L_31_[4] = 260
-	elseif L_31_[1] >= 1500 then
-		L_31_[4] = 300
-	end
-	TweenPlayer = (game:GetService("TweenService")):Create(game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"], TweenInfo["new"](L_31_[1] / L_31_[4], Enum["EasingStyle"]["Linear"]), {
-		["CFrame"] = L_31_[2]
-	})
-	TweenPlayer:Play()
-end
-CurrentTick = tick()
-Player = (game:GetService("Players"))["LocalPlayer"]
-StateFunction = function()
-	if CurrentState then
-		CurrentState:Cancel()
-		CurrentState = nil
-	end
-end
-TeleportTo = function(L_32_arg0, L_33_arg1, L_34_arg2)
-	local L_35_ = {}
-	L_35_[10], L_35_[3], L_35_[4] = L_32_arg0, L_33_arg1, L_34_arg2
-	L_35_[12] = 300
-	if L_35_[3] == 1.6 then
-		L_35_[12] = 350
-	end
-	L_35_[11] = L_35_[4] or 130
-	L_35_[9] = Player["Character"] and Player["Character"]:FindFirstChild("HumanoidRootPart")
-	L_35_[7] = Player["Character"] and Player["Character"]:FindFirstChild("Humanoid")
-	if not L_35_[9] or not L_35_[7] then
-		return
-	end
-	L_35_[13] = (L_35_[10]["Position"] - L_35_[9]["Position"])["Magnitude"]
-	if L_35_[13] > 3000 and L_35_[7]["Health"] > 0 then
-		local L_36_ = {}
-		L_36_[1] = {
-			{
-				Vector3["new"](61163.85, 11.67, 1819.78),
-				"Old_World"
-			},
-			{
-				Vector3["new"](-4607.82, 872.54, -1667.55);
-				"Old_World"
-			};
-			{
-				Vector3["new"](-7894.61, 5547.14, -380.29),
-				"Old_World"
-			},
-			{
-				Vector3["new"](923.21, 126.97, 32852.83);
-				"New_World"
-			};
-			{
-				Vector3["new"](-2953.31, 41.01, 2099.17);
-				"Old_World"
-			}
-		}
-		for L_37_forvar0, L_38_forvar1 in pairs(L_36_[1]) do
-			local L_39_ = {}
-			L_39_[3], L_39_[1] = L_37_forvar0, L_38_forvar1
-			if _G[L_39_[1][2]] and (L_39_[1][1] - L_35_[10]["Position"])["Magnitude"] <= 2300 then
-				(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("requestEntrance", L_39_[1][1])
-				break
-			end
-		end
-	end
-	CurrentTick = tick()
-	StateFunction()
-	L_35_[6] = (L_35_[10]["Position"] - L_35_[9]["Position"])["Magnitude"]
-	L_35_[9]["CFrame"] = CFrame["new"](L_35_[9]["Position"]["X"], L_35_[10]["Position"]["Y"], L_35_[9]["Position"]["Z"])
-	if L_35_[6] < 130 then
-		pcall(function()
-			L_35_[9]["CFrame"] = L_35_[10]
-		end)
-		return
-	elseif L_35_[6] < L_35_[11] then
-		L_35_[12] = 350
-	end
-	for L_40_forvar0, L_41_forvar1 in pairs(Player["Character"]:GetDescendants()) do
-		local L_42_ = {}
-		L_42_[2], L_42_[3] = L_40_forvar0, L_41_forvar1
-		if L_42_[3]:IsA("BasePart") and L_42_[3]["CanCollide"] then
-			L_42_[3]["CanCollide"] = false
-		end
-	end
-	L_35_[8] = L_35_[6] / L_35_[12]
-	L_35_[2] = TweenInfo["new"](L_35_[8], Enum["EasingStyle"]["Linear"])
-	L_35_[5] = {
-		["CFrame"] = L_35_[10]
-	}
-	CurrentState = (game:GetService("TweenService")):Create(L_35_[9], L_35_[2], L_35_[5])
-	CurrentState:Play()
-end
-Attack = function()
-	if God_Human_C_M then
-		local L_43_ = {}
-		L_43_[1] = (game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("getInventory")
-		for L_44_forvar0, L_45_forvar1 in pairs(L_43_[1]) do
-			local L_46_ = {}
-			L_46_[1], L_46_[3] = L_44_forvar0, L_45_forvar1
-			if L_46_[3]["Type"] == "Sword" then
-				if L_46_[3]["Name"] == "Tushita" and L_46_[3]["Mastery"] >= 400 then
-					Tushita_M = true
-				elseif L_46_[3]["Name"] == "Yama" and L_46_[3]["Mastery"] >= 400 then
-					Yama_M = true
-				end
-			end
-		end
-		if not Tushita_M then
-			if not Utils["ffc"](Player["Backpack"], "Tushita") and not Utils["ffc"](Player["Character"], "Tushita") then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadItem", "Tushita")
-			end
-		elseif not Yama_M then
-			if not Utils["ffc"](Player["Backpack"], "Yama") and not Utils["ffc"](Player["Character"], "Yama") then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadItem", "Yama")
-			end
-		end
-		for L_47_forvar0, L_48_forvar1 in pairs(Player["Backpack"]:GetChildren()) do
-			local L_49_ = {}
-			L_49_[2], L_49_[1] = L_47_forvar0, L_48_forvar1
-			if L_49_[1]:IsA("Tool") and tostring(L_49_[1]["ToolTip"]) == "Sword" then
-				(Player["Character"]:WaitForChild("Humanoid")):EquipTool(L_49_[1])
-			end
-		end
-	else
-		for L_50_forvar0, L_51_forvar1 in pairs(Player["Backpack"]:GetChildren()) do
-			local L_52_ = {}
-			L_52_[2], L_52_[1] = L_50_forvar0, L_51_forvar1
-			if L_52_[1]:IsA("Tool") and tostring(L_52_[1]["ToolTip"]) == "Melee" then
-				(Player["Character"]:WaitForChild("Humanoid")):EquipTool(L_52_[1])
-			end
-		end
-	end
-end
-function TPBoat(L_53_arg0, L_54_arg1, L_55_arg2, L_56_arg3)
-	local L_57_ = {}
-	L_57_[3], L_57_[5], L_57_[4], L_57_[6] = L_53_arg0, L_54_arg1, L_55_arg2, L_56_arg3
-	if L_57_[6] == nil then
-		L_57_[6] = false
-	end
-	L_57_[1] = (L_57_[3]["Position"] - L_57_[5]["Position"])["Magnitude"]
-	Speed = L_57_[4]
-	TweenP = (game:GetService("TweenService")):Create(L_57_[5], TweenInfo["new"](L_57_[1] / Speed, Enum["EasingStyle"]["Linear"]), {
-		["CFrame"] = L_57_[3]
-	})
-	if L_57_[6] == true then
-		TweenP:Cancel()
-	else
-		TweenP:Play()
-	end
-end
-setmetatable(Utils, {
-	["__index"] = function(L_58_arg0, L_59_arg1)
-		local L_60_ = {}
-		L_60_[2], L_60_[3] = L_58_arg0, L_59_arg1
-		if L_60_[3] == "wt" then
-			return function(L_61_arg0)
-				local L_62_ = {}
-				L_62_[2] = L_61_arg0
-				return task["wait"](L_62_[2])
-			end
-		elseif L_60_[3] == "p" then
-			return function(...)
-				return pcall(...)
-			end
-		elseif L_60_[3] == "sf" then
-			return function(L_63_arg0, L_64_arg1)
-				local L_65_ = {}
-				L_65_[2], L_65_[3] = L_63_arg0, L_64_arg1
-				return string["find"](L_65_[2], tostring(L_65_[3]))
-			end
-		elseif L_60_[3] == "cf" then
-			return function(...)
-				Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer(...)
-			end
-		elseif L_60_[3] == "ffc" then
-			return function(L_66_arg0, L_67_arg1)
-				local L_68_ = {}
-				L_68_[3], L_68_[2] = L_66_arg0, L_67_arg1
-				return L_68_[3] and L_68_[3]:FindFirstChild(L_68_[2])
-			end
-		elseif L_60_[3] == "Equip" then
-			return function(L_69_arg0)
-				local L_70_ = {}
-				L_70_[2] = L_69_arg0
-				if not L_70_[2] or type(L_70_[2]) ~= "string" then
-					return
-				end
-				for L_71_forvar0, L_72_forvar1 in pairs(Player["Backpack"]:GetChildren()) do
-					local L_73_ = {}
-					L_73_[3], L_73_[2] = L_71_forvar0, L_72_forvar1
-					if L_73_[2]:IsA("Tool") and L_73_[2]["Name"] == L_70_[2] then
-						(Player["Character"]:WaitForChild("Humanoid")):EquipTool(L_73_[2])
-					end
-				end
-			end
-		elseif L_60_[3] == "gi" then
-			return function(L_74_arg0)
-				local L_75_ = {}
-				L_75_[2] = L_74_arg0
-				if Utils["ffc"](Player["Backpack"], L_75_[2]) or Utils["ffc"](Player["Character"], L_75_[2]) then
-					return true
-				end
-				for L_76_forvar0, L_77_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventoryWeapons")) do
-					local L_78_ = {}
-					L_78_[2], L_78_[1] = L_76_forvar0, L_77_forvar1
-					if L_78_[1]["Name"] == L_75_[2] then
-						return true
-					end
-				end
-				return false
-			end
-		elseif L_60_[3] == "tf" then
-			return function(L_79_arg0, L_80_arg1)
-				local L_81_ = {}
-				L_81_[3], L_81_[1] = L_79_arg0, L_80_arg1
-				return table["find"](L_81_[3], L_81_[1])
-			end
-		elseif L_60_[3] == "CheckBoss" then
-			return function(L_82_arg0)
-				local L_83_ = {}
-				L_83_[1] = L_82_arg0
-				if Utils["ffc"](ReplicatedStorage, L_83_[1]) or Utils["ffc"](Enemies, L_83_[1]) then
-					return true
-				end
-				return false
-			end
-		elseif L_60_[3] == "IsHall" then
-			return function()
-				if Utils["ffc"](Workspace["Map"], "IceCastle") then
-					if Utils["ffc"](Workspace["Map"]["IceCastle"]["Hall"]["LibraryDoor"], "Keyhole") then
-						return true
-					end
-				end
-				return false
-			end
-		elseif L_60_[3] == "CheckBackpack" then
-			return function(L_84_arg0)
-				local L_85_ = {}
-				L_85_[1] = L_84_arg0
-				if Utils["ffc"](Player["Backpack"], L_85_[1]) or Utils["ffc"](Player["Character"], L_85_[1]) then
-					return true
-				end
-				return false
-			end
-		elseif L_60_[3] == "GetMobRaid" then
-			return function()
-				local L_86_ = {}
-				L_86_[2] = {}
-				for L_87_forvar0, L_88_forvar1 in pairs(Enemies:GetChildren()) do
-					local L_89_ = {}
-					L_89_[1], L_89_[2] = L_87_forvar0, L_88_forvar1
-					if L_89_[2]:FindFirstChild("HumanoidRootPart") and (L_89_[2]:FindFirstChild("Humanoid") and (L_89_[2]["Humanoid"]["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["Position"] - L_89_[2]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5000)) then
-						table["insert"](L_86_[2], L_89_[2])
-					end
-				end
-				return L_86_[2]
-			end
-		elseif L_60_[3] == "GetFruits" then
-			return function()
-				local L_90_ = {}
-				L_90_[2] = {}
-				for L_91_forvar0, L_92_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-					local L_93_ = {}
-					L_93_[3], L_93_[1] = L_91_forvar0, L_92_forvar1
-					if L_93_[1]["Type"] == "Blox Fruit" and L_93_[1]["Value"] <= 999999 then
-						table["insert"](L_90_[2], {
-							["Name"] = L_93_[1]["Name"],
-							["Value"] = L_93_[1]["Value"]
-						})
-					end
-				end
-				return L_90_[2]
-			end
-		elseif L_60_[3] == "GetRaid" then
-			return function(L_94_arg0, L_95_arg1)
-				local L_96_ = {}
-				L_96_[3], L_96_[1] = L_94_arg0, L_95_arg1
-				for L_97_forvar0, L_98_forvar1 in pairs(Workspace["_WorldOrigin"]["Locations"]:GetChildren()) do
-					local L_99_ = {}
-					L_99_[1], L_99_[2] = L_97_forvar0, L_98_forvar1
-					if L_99_[2]:IsA("Part") or L_99_[2]:IsA("BasePart") then
-						if L_99_[2]["Name"] == L_96_[3] and (L_99_[2]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= L_96_[1] then
-							return L_99_[2]
-						end
-					end
-				end
-				return nil
-			end
-		elseif L_60_[3] == "GetType" then
-			return function()
-				local L_100_ = {}
-				L_100_[1] = {}
-				for L_101_forvar0, L_102_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-					local L_103_ = {}
-					L_103_[2], L_103_[3] = L_101_forvar0, L_102_forvar1
-					if L_103_[3]["Type"] == "Blox Fruit" then
-						table["insert"](L_100_[1], L_103_[3]["Name"])
-					end
-				end
-				return L_100_[1]
-			end
-		elseif L_60_[3] == "IsInList" then
-			return function(L_104_arg0, L_105_arg1)
-				local L_106_ = {}
-				L_106_[3], L_106_[2] = L_104_arg0, L_105_arg1
-				for L_107_forvar0, L_108_forvar1 in pairs(L_106_[3]) do
-					local L_109_ = {}
-					L_109_[2], L_109_[3] = L_107_forvar0, L_108_forvar1
-					if L_109_[3] == L_106_[2] then
-						return true
-					end
-				end
-				return false
-			end
-		elseif L_60_[3] == "IsHeavenly" then
-			return function()
-				for L_110_forvar0, L_111_forvar1 in pairs(((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("getTitles")) do
-					local L_112_ = {}
-					L_112_[1], L_112_[3] = L_110_forvar0, L_111_forvar1
-					if L_112_[3]["Name"] == "Heavenly Devil" then
-						return true
-					end
-				end
-				return false
-			end
-		elseif L_60_[3] == "GetMonster" then
-			return function(L_113_arg0)
-				local L_114_ = {}
-				L_114_[2] = L_113_arg0
-				pcall(function()
-					for L_115_forvar0, L_116_forvar1 in pairs(Enemies:GetChildren()) do
-						local L_117_ = {}
-						L_117_[3], L_117_[1] = L_115_forvar0, L_116_forvar1
-						if L_117_[1]:IsA("Model") and (L_117_[1]:FindFirstChild("Humanoid") and (L_117_[1]["Humanoid"]["Health"] > 0 and (L_117_[1]["HumanoidRootPart"]["Position"] - game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= L_114_[2])) then
-							Monster = L_117_[1]
-							return
-						end
-					end
-				end)
-			end
-		elseif L_60_[3] == "GetMon_Soul" then
-			return function()
-				for L_118_forvar0, L_119_forvar1 in next, (game:GetService("Workspace"))["Enemies"]:GetChildren() do
-					local L_120_ = {}
-					L_120_[3], L_120_[2] = L_118_forvar0, L_119_forvar1
-					if L_120_[2]["Name"] == "Living Zombie" then
-						table["insert"](get_mon, L_120_[2]["Name"])
-					end
-				end
-			end
-		elseif L_60_[3] == "click" then
-			return function(L_121_arg0)
-				local L_122_ = {}
-				L_122_[1] = L_121_arg0
-				VirtualInputManager:SendMouseButtonEvent(L_122_[1]["AbsolutePosition"]["X"] + L_122_[1]["AbsoluteSize"]["X"] / 2, L_122_[1]["AbsolutePosition"]["Y"] + 90, 0, true, L_122_[1], 1)
-				VirtualInputManager:SendMouseButtonEvent(L_122_[1]["AbsolutePosition"]["X"] + L_122_[1]["AbsoluteSize"]["X"] / 2, L_122_[1]["AbsolutePosition"]["Y"] + 90, 0, false, L_122_[1], 1)
-			end
-		elseif L_60_[3] == "HopLowServer" then
-			return function(L_123_arg0)
-				local L_124_ = {}
-				L_124_[1] = L_123_arg0
-				pcall(function()
-					local L_125_ = {}
-					if not L_124_[1] then
-						L_124_[1] = 10
-					end
-					ticklon = tick()
-					repeat
-						task["wait"]()
-					until tick() - ticklon >= 1
-					L_125_[1] = function()
-						if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    						require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                            task.wait(TimeHop)
-                            require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-						else
-							require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-						end
-						for L_126_forvar0 = 1, math["huge"], 1 do
-							local L_127_ = {}
-							L_127_[2] = L_126_forvar0
-							if ChooseRegion == nil or ChooseRegion == "" then
-								ChooseRegion = "Singapore"
-							else
-								(game:GetService("Players"))["LocalPlayer"]["PlayerGui"]["ServerBrowser"]["Frame"]["Filters"]["SearchRegion"]["TextBox"]["Text"] = ChooseRegion
-							end
-							L_127_[1] = (game:GetService("ReplicatedStorage"))["__ServerBrowser"]:InvokeServer(L_127_[2])
-							for L_128_forvar0, L_129_forvar1 in pairs(L_127_[1]) do
-								local L_130_ = {}
-								L_130_[2], L_130_[3] = L_128_forvar0, L_129_forvar1
-								if L_130_[2] ~= game["JobId"] and L_130_[3]["Count"] < L_124_[1] then
-									(game:GetService("ReplicatedStorage"))["__ServerBrowser"]:InvokeServer("teleport", L_130_[2])
-								end
-							end
-						end
-						return false
-					end
-					if not(getgenv())["Loaded"] then
-						local L_131_ = {}
-						L_131_[1] = function(L_132_arg0)
-							local L_133_ = {}
-							L_133_[1] = L_132_arg0
-							if L_133_[1]["Name"] == "ErrorPrompt" then
-								if L_133_[1]["Visible"] then
-									if L_133_[1]["TitleFrame"]["ErrorTitle"]["Text"] == "Teleport Failed" then
-										HopLowServer()
-										L_133_[1]["Visible"] = false
-									end
-								end;
-								(L_133_[1]:GetPropertyChangedSignal("Visible")):Connect(function()
-									if L_133_[1]["Visible"] then
-										if L_133_[1]["TitleFrame"]["ErrorTitle"]["Text"] == "Teleport Failed" then
-											HopLowServer()
-											L_133_[1]["Visible"] = false
-										end
-									end
-								end)
-							end
-						end
-						for L_134_forvar0, L_135_forvar1 in pairs(game["CoreGui"]["RobloxPromptGui"]["promptOverlay"]:GetChildren()) do
-							local L_136_ = {}
-							L_136_[3], L_136_[1] = L_134_forvar0, L_135_forvar1
-							L_131_[1](L_136_[1])
-						end
-						game["CoreGui"]["RobloxPromptGui"]["promptOverlay"]["ChildAdded"]:Connect(L_131_[1]);
-						(getgenv())["Loaded"] = true
-					end
-					while task["wait"](.1) do
-						L_125_[1]()
-					end
-				end)
-			end
-		elseif L_60_[3] == "CheckItem" then
-			return function(L_137_arg0)
-				local L_138_ = {}
-				L_138_[2] = L_137_arg0
-				for L_139_forvar0, L_140_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-					local L_141_ = {}
-					L_141_[2], L_141_[3] = L_139_forvar0, L_140_forvar1
-					if type(L_141_[3]) == "table" then
-						if L_141_[3]["Type"] == "Material" then
-							if L_141_[3]["Name"] == L_138_[2] then
-								return L_141_[3]["Count"]
-							end
-						end
-					end
-				end
-				return 0
-			end
-		elseif L_60_[3] == "FarmBone" then
-			return function(L_142_arg0)
-				local L_143_ = {}
-				L_143_[1] = L_142_arg0
-				if L_143_[1] then
-					if Utils["ffc"](Player["Backpack"], "Fire Essence") or Utils["ffc"](Player["Character"], "Fire Essence") then
-						repeat
-							SetStatusFarm("Using Fire Essence")
-							Utils["Equip"]("Fire Essence")
-							Utils["wt"](.5)
-					        if World3 then
-                                Player.Character.Humanoid.PlatformStand = true
-                                topos(CFrame.new(5663, 1211, 861))
-                                Player.Character.Humanoid.PlatformStand = false
-                                Player.Character.HumanoidRootPart.Anchored = true
-                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon", true)
-                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                                task.wait(0.5)
-                                Player.Character.HumanoidRootPart.Anchored = false
-                            end
-						until not Utils["ffc"](Player["Backpack"], "Fire Essence") and not Utils["ffc"](Player["Character"], "Fire Essence")
-                        if World3 then
-                            Player.Character.Humanoid.PlatformStand = true
-                            topos(CFrame.new(5663, 1211, 861))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                            task.wait(0.5)
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        end
-						Dragon_Talon_C = true
-						SendWebhook("Melee Purchased: Dragon Talon")
-					else
-						if Utils["ffc"](Enemies, "Demonic Soul") or Utils["ffc"](Enemies, "Posessed Mummy") or Utils["ffc"](Enemies, "Reborn Skeleton") or Utils["ffc"](Enemies, "Living Zombie") then
-							for L_144_forvar0, L_145_forvar1 in pairs(Enemies:GetChildren()) do
-								local L_146_ = {}
-								L_146_[3], L_146_[1] = L_144_forvar0, L_145_forvar1
-								if L_146_[1]["Name"] == "Reborn Skeleton" or L_146_[1]["Name"] == "Living Zombie" or L_146_[1]["Name"] == "Demonic Soul" or L_146_[1]["Name"] == "Posessed Mummy" then
-									if L_146_[1]:FindFirstChild("HumanoidRootPart") and (L_146_[1]:FindFirstChild("Humanoid") and L_146_[1]["Humanoid"]["Health"] > 0) then
-										repeat
-											Utils["wt"](.1)
-											if Utils["CheckItem"]("Bones") > 500 and ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check") > 0 then
-												repeat
-													Utils["wt"](.2)
-													ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check")
-													ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Buy", 1, 1)
-												until ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check") == 0
-											end
-											if not Utils["ffc"](Player["Character"], "HasBuso") then
-												Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-											end
-											TeleportTo(L_146_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5, 200)
-											Attack()
-											Utils["BN"](L_146_[1]["Name"])
-										until not L_146_[1]["Parent"] or L_146_[1]["Humanoid"]["Health"] <= 0
-									end
-								end
-							end
-						else
-							TeleportTo(CFrame["new"](-9505.8720703125, 172.10482788086, 6158.9931640625), 1.5)
-						end
-					end
-				else
-					if Utils["ffc"](Enemies, "Demonic Soul") or Utils["ffc"](Enemies, "Posessed Mummy") or Utils["ffc"](Enemies, "Reborn Skeleton") or Utils["ffc"](Enemies, "Living Zombie") then
-						for L_147_forvar0, L_148_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_149_ = {}
-							L_149_[1], L_149_[2] = L_147_forvar0, L_148_forvar1
-							if L_149_[2]["Name"] == "Reborn Skeleton" or L_149_[2]["Name"] == "Living Zombie" or L_149_[2]["Name"] == "Demonic Soul" or L_149_[2]["Name"] == "Posessed Mummy" then
-								if L_149_[2]:FindFirstChild("HumanoidRootPart") and (L_149_[2]:FindFirstChild("Humanoid") and L_149_[2]["Humanoid"]["Health"] > 0) then
-									repeat
-										Utils["wt"](.1)
-										if Utils["CheckItem"]("Bones") > 500 and ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check") > 0 then
-											repeat
-												Utils["wt"](.2)
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check")
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Buy", 1, 1)
-											until ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check") == 0
-										end
-										if not Utils["ffc"](Player["Character"], "HasBuso") then
-											Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-										end
-										TeleportTo(L_149_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5, 200)
-										Attack()
-										Utils["BN"](L_149_[2]["Name"])
-									until not L_149_[2]["Parent"] or L_149_[2]["Humanoid"]["Health"] <= 0
-								end
-							end
-						end
-					else
-						TeleportTo(CFrame["new"](-9505.8720703125, 172.10482788086, 6158.9931640625), 1.5)
-					end
-				end
-			end
-		elseif L_60_[3] == "Get_Item_Inventory" then
-			return function(L_150_arg0)
-				local L_151_ = {}
-				L_151_[2] = L_150_arg0
-				if not Utils["ffc"](Player["Backpack"], L_151_[2]) and not Utils["ffc"](Player["Character"], L_151_[2]) then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadItem", tostring(L_151_[2]))
-				end
-			end
-		elseif L_60_[3] == "BN" then
-			return function(L_152_arg0)
-				local L_153_ = {}
-				L_153_[2] = L_152_arg0
-				pcall(function()
-					local L_154_ = {}
-					L_154_[3] = game["Players"]["LocalPlayer"]
-					L_154_[2] = L_154_[3]["Character"] and L_154_[3]["Character"]:FindFirstChild("HumanoidRootPart")
-					if not L_154_[2] then
-						return
-					end
-					for L_155_forvar0, L_156_forvar1 in pairs(game["Workspace"]["Enemies"]:GetChildren()) do
-						local L_157_ = {}
-						L_157_[2], L_157_[3] = L_155_forvar0, L_156_forvar1
-						if L_157_[3]:IsA("Model") and (L_157_[3]["Name"] == L_153_[2] and (L_157_[3]:FindFirstChild("Humanoid") and L_157_[3]:FindFirstChild("HumanoidRootPart"))) then
-							local L_158_ = {}
-							L_158_[3], L_158_[2] = L_157_[3]["Humanoid"], L_157_[3]["HumanoidRootPart"]
-							if L_158_[3]["Health"] > 0 and (L_158_[2]["Position"] - L_154_[2]["Position"])["Magnitude"] <= 350 then
-								local L_159_ = {}
-								L_159_[2] = nil
-								for L_160_forvar0, L_161_forvar1 in pairs(game["Workspace"]["Enemies"]:GetChildren()) do
-									local L_162_ = {}
-									L_162_[1], L_162_[2] = L_160_forvar0, L_161_forvar1
-									if L_162_[2] ~= L_157_[3] and (L_162_[2]:IsA("Model") and (L_162_[2]["Name"] == L_153_[2] and L_162_[2]:FindFirstChild("HumanoidRootPart"))) then
-										L_159_[2] = L_162_[2]["HumanoidRootPart"]
-										break
-									end
-								end
-								if L_159_[2] then
-									local L_163_ = {}
-									L_163_[1] = Instance["new"]("BodyPosition")
-									L_163_[1]["Position"] = L_159_[2]["Position"] + Vector3["new"](0, 0, 0)
-									L_163_[1]["MaxForce"] = Vector3["new"](1000000, 1000000, 1000000)
-									L_163_[1]["P"] = 3000
-									L_163_[1]["D"] = 100
-									L_163_[1]["Name"] = "EnemyFlyPosition"
-									L_163_[1]["Parent"] = L_158_[2]
-								end
-								L_158_[2]["CanCollide"] = false
-								L_158_[3]:ChangeState(14)
-								L_158_[3]["WalkSpeed"] = 0
-								if L_158_[3]:FindFirstChild("Animator") then
-									L_158_[3]["Animator"]:Destroy()
-								end
-								for L_164_forvar0, L_165_forvar1 in pairs(L_157_[3]:GetDescendants()) do
-									local L_166_ = {}
-									L_166_[2], L_166_[3] = L_164_forvar0, L_165_forvar1
-									if L_166_[3]:IsA("BasePart") then
-										L_166_[3]["CanCollide"] = false
-										L_166_[3]["CanTouch"] = false
-										L_166_[3]["CanQuery"] = false
-									end
-								end
-								if L_157_[3]:FindFirstChild("Head") then
-									L_157_[3]["Head"]["CanCollide"] = false
-								end
-							end
-						end
-					end
-					sethiddenproperty(L_154_[3], "SimulationRadius", math["huge"])
-				end)
-			end
-		elseif L_60_[3] == "Status" then
-			return function(L_167_arg0)
-				local L_168_ = {}
-				L_168_[2] = L_167_arg0
-				Runtime[26]["Text"] = L_168_[2]
-			end
-		elseif L_60_[3] == "GetQuest" then
-			return function(L_169_arg0)
-				local L_170_ = {}
-				L_170_[1] = L_169_arg0
-				if (Vector3["new"](-12379.1406, 601.433167, -6543.60742) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] > 30 then
-					TeleportTo(CFrame["new"](-12379.1406, 601.433167, -6543.60742), 1.5)
-				elseif (Vector3["new"](-12379.1406, 601.433167, -6543.60742) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] < 30 then
-					if L_170_[1] == "Good" then
-						repeat
-							wait(.1)
-							TeleportTo(CFrame["new"](-12392.5068, 603.319763, -6596.00586), 1.5)
-						until (Vector3["new"](-12392.5068, 603.319763, -6596.00586) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-						wait(1)
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "Progress", "Good")
-						wait(1)
-						SendWebhook("Start Tusita Trial (Get CDK)")
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "StartTrial", "Good")
-					elseif L_170_[1] == "Evil" then
-						repeat
-							wait(.1)
-							TeleportTo(CFrame["new"](-12392.2637, 603.319763, -6503.27832), 1.5)
-						until (Vector3["new"](-12392.2637, 603.319763, -6503.27832) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-						wait(1)
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "Progress", "Evil")
-						wait(1)
-						SendWebhook("Start Yama Trial (Get CDK)")
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "StartTrial", "Evil")
-					end
-				end
-			end
-		elseif L_60_[3] == "GetTorch" then
-			return function(L_171_arg0)
-				local L_172_ = {}
-				L_172_[2] = L_171_arg0
-				repeat
-					wait()
-					TeleportTo(Workspace["Map"]["HeavenlyDimension"][L_172_[2]]["CFrame"], 1.5)
-				until (Workspace["Map"]["HeavenlyDimension"][L_172_[2]]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 7
-				fireproximityprompt(workspace["Map"]["HeavenlyDimension"][L_172_[2]]["ProximityPrompt"])
-				wait(.5)
-			end
-		elseif L_60_[3] == "GetTorchX" then
-			return function(L_173_arg0)
-				local L_174_ = {}
-				L_174_[1] = L_173_arg0
-				repeat
-					wait()
-					TeleportTo(Workspace["Map"]["HellDimension"][L_174_[1]]["CFrame"], 1.5)
-				until (Workspace["Map"]["HellDimension"][L_174_[1]]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 7
-				fireproximityprompt(workspace["Map"]["HellDimension"][L_174_[1]]["ProximityPrompt"])
-				wait(.5)
-			end
-		end
-	end
-})
-PlayersService = game:GetService("Players")
-ReplicatedStorage = game:GetService("ReplicatedStorage")
-Workspace = game:GetService("Workspace")
-UtilsState = {}
-UtilsState["__index"] = UtilsState
-Runtime[51] = PlayersService["LocalPlayer"]
-task["spawn"](function()
-	while task["wait"](.5) do
-		Utils["p"](function()
-			if Player["Data"]["Points"]["Value"] > 0 and Player["Data"]["Stats"]["Melee"]["Level"]["Value"] < 2650 then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("AddPoint", "Melee", Player["Data"]["Points"]["Value"])
-			end
-			if Player["Data"]["Stats"]["Melee"]["Level"]["Value"] >= 2650 and (Player["Data"]["Points"]["Value"] > 0 and Player["Data"]["Stats"]["Defense"]["Level"]["Value"] < 2550) then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("AddPoint", "Defense", Player["Data"]["Points"]["Value"])
-			end
-			if not Utils["ffc"](Player["Character"], "HasBuso") then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-			end
-		end)
-	end
-end);
-(getgenv())["Fast Attack"] = true
-Runtime[20] = 0
-task["spawn"](function()
-	while task["wait"](Runtime[20]) do
-		if (getgenv())["Fast Attack"] and not Stop_Fast_Attack then
-			if Utils["sf"](Player["PlayerGui"]["Main"]["Version"]["Text"], "v26.6.1") then
-				xpcall(function()
-					if (Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait()):FindFirstChildOfClass("Tool") and ((Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait()):FindFirstChildOfClass("Humanoid") and (Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait())["Humanoid"]["Health"] > 0) then
-						for L_175_forvar0, L_176_forvar1 in pairs(Workspace["Enemies"]:GetChildren()) do
-							local L_177_ = {}
-							L_177_[1], L_177_[3] = L_175_forvar0, L_176_forvar1
-							if L_177_[3]:FindFirstChildOfClass("Humanoid") and (L_177_[3]["Humanoid"]["Health"] > 0 and L_177_[3]:FindFirstChild("HumanoidRootPart")) then
-								if (L_177_[3]["HumanoidRootPart"]["Position"] - Runtime[51]["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 60 then
-									local L_178_ = {}
-									if (Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait()):FindFirstChild("Stun") then
-										(Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait())["Stun"]["Value"] = 0
-									end
-									if (Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait()):FindFirstChild("Busy") then
-										(Runtime[51]["Character"] or Runtime[51]["CharacterAdded"]:Wait())["Busy"]["Value"] = false
-									end
-									if L_177_[3]:FindFirstChild("Stun") then
-										L_177_[3]["Stun"]["Value"] = 0
-									end
-									if L_177_[3]:FindFirstChild("Busy") then
-										L_177_[3]["Busy"]["Value"] = false
-									end
-									if ReplicatedStorage["Modules"]["Net"]:FindFirstChild("RE") and ReplicatedStorage["Modules"]["Net"]["RE"]:FindFirstChild("RegisterHit") then
-										ReplicatedStorage["Modules"]["Net"]["RE"]["RegisterHit"]:SetAttribute("Virtual", not ReplicatedStorage["Modules"]["Net"]["RE"]["RegisterHit"]:GetAttribute("Virtual"))
-									end
-									if Runtime[51]["Character"] then
-										Runtime[51]["Character"]:SetAttribute("Clashable", not Runtime[51]["Character"]:GetAttribute("Clashable"))
-									end
-									L_178_[2] = 0
-									for L_179_forvar0, L_180_forvar1 in pairs(Workspace["Enemies"]:GetChildren()) do
-										local L_181_ = {}
-										L_181_[1], L_181_[3] = L_179_forvar0, L_180_forvar1
-										if L_181_[3]:FindFirstChildOfClass("Humanoid") and (L_181_[3]["Humanoid"]["Health"] > 0 and (L_181_[3]:FindFirstChild("HumanoidRootPart") and (L_181_[3]["HumanoidRootPart"]["Position"] - Runtime[51]["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 60)) then
-											L_178_[2] = L_178_[2] + 1
-											if L_178_[2] > 5 then
-												Runtime[20] = .1
-											elseif L_178_[2] > 2 and L_178_[2] <= 5 then
-												Runtime[20] = .03
-											else
-												Runtime[20] = 0
-											end;
-											(Net:RemoteEvent("RegisterAttack")):FireServer(math["huge"]);
-											(Net:RemoteEvent("RegisterHit", true)):FireServer(L_181_[3]["Head"], {
-												{
-													L_181_[3],
-													L_181_[3]["Head"]
-												};
-												L_181_[3]["Head"]
-											}, nil, (tostring(Runtime[51]["UserId"])):sub(2, 4) .. (tostring(coroutine["running"]())):sub(11, 15))
-										end
-									end
-								end
-							end
-						end
-					end
-				end, warn)
-			else
-				local L_182_ = {}
-				assert(getrenv, TableConcat({
-					"Exploit not supporte";
-					"d"
-				}))
-				L_182_[11] = game:GetService("CollectionService")
-				L_182_[2] = game:GetService("ReplicatedStorage")
-				L_182_[8] = game:GetService("Players")
-				L_182_[6] = L_182_[8]["LocalPlayer"]
-				L_182_[3] = debug["getupvalue"]((getrenv())["_G"]["SendHitsToServer"], 1)
-				L_182_[5] = L_182_[2]["Modules"]["Net"]["RE/RegisterAttack"]
-				L_182_[4] = function()
-					local L_183_ = {}
-					L_183_[3] = L_182_[11]:GetTagged("BasicMob")
-					if #L_183_[3] == 0 then
-						return nil
-					end
-					L_183_[4] = {}
-					L_183_[2] = L_182_[6]["Character"] and L_182_[6]["Character"]["PrimaryPart"]["Position"]
-					if not L_183_[2] then
-						return nil
-					end
-					for L_184_forvar0, L_185_forvar1 in pairs(L_183_[3]) do
-						local L_186_ = {}
-						L_186_[1], L_186_[4] = L_184_forvar0, L_185_forvar1
-						L_186_[5] = L_186_[4]:FindFirstChildOfClass("Humanoid")
-						L_186_[3] = L_186_[4]["PrimaryPart"]
-						if L_186_[5] and (L_186_[5]["Health"] > 0 and L_186_[3]) then
-							local L_187_ = {}
-							L_187_[1] = (L_186_[3]["Position"] - L_183_[2])["Magnitude"]
-							if L_187_[1] <= 100 then
-								L_183_[4][#L_183_[4] + 1] = {
-									["mob"] = L_186_[4];
-									["distance"] = L_187_[1]
-								}
-							end
-						end
-					end
-					if #L_183_[4] == 0 then
-						return nil
-					end
-					table["sort"](L_183_[4], function(L_188_arg0, L_189_arg1)
-						local L_190_ = {}
-						L_190_[1], L_190_[2] = L_188_arg0, L_189_arg1
-						return L_190_[1]["distance"] < L_190_[2]["distance"]
-					end)
-					return #L_183_[4] > 2 and {
-						L_183_[4][1],
-						L_183_[4][2]
-					} or L_183_[4]
-				end
-				L_182_[1] = function()
-					local L_191_ = {}
-					L_191_[3] = L_182_[4]()
-					if not L_191_[3] then
-						return
-					end
-					L_191_[2] = {}
-					for L_192_forvar0, L_193_forvar1 in pairs(L_191_[3]) do
-						local L_194_ = {}
-						L_194_[4], L_194_[2] = L_192_forvar0, L_193_forvar1
-						L_194_[1] = L_194_[2]["mob"]:FindFirstChild("HumanoidRootPart")
-						if L_194_[1] then
-							L_191_[2][#L_191_[2] + 1] = {
-								L_194_[2]["mob"];
-								L_194_[1]
-							}
-						end
-					end
-					if #L_191_[2] > 0 then
-						L_182_[5]:FireServer(0 / 0)
-						coroutine["resume"](L_182_[3], L_191_[2][1][2], {
-							table["unpack"](L_191_[2], 2)
-						})
-					end
-				end
-				L_182_[7], L_182_[9] = pcall(function()
-					L_182_[1]()
-				end)
-				if not L_182_[7] then
-					warn(TableConcat({
-						"Error in Combat scri",
-						"pt: "
-					}) .. tostring(L_182_[9]))
-				end
-			end
-		end
-	end
-end)
-for L_195_forvar0, L_196_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-	local L_197_ = {}
-	L_197_[1], L_197_[3] = L_195_forvar0, L_196_forvar1
-	if L_197_[3]["Type"] == "Material" then
-		if L_197_[3]["Name"] == "Mirror Fractal" then
-			Mirror_Fractal_H = true
-		end
-	end
-end
-Player["PlayerGui"]["Notifications"]["Enabled"] = false
-if (((ReplicatedStorage:WaitForChild("Modules")):WaitForChild("Net")):WaitForChild("RF/FruitCustomizerRF")):InvokeServer({
-	["StorageName"] = "Pure Red";
-	["Type"] = "AuraSkin";
-	["Context"] = "Equip"
-}) ~= false then
-	Pure_Red_H = true
-end
-if (((ReplicatedStorage:WaitForChild("Modules")):WaitForChild("Net")):WaitForChild("RF/FruitCustomizerRF")):InvokeServer({
-	["StorageName"] = "Snow White";
-	["Type"] = "AuraSkin",
-	["Context"] = "Equip"
-}) ~= false then
-	Snow_White = true
-end
-if (((ReplicatedStorage:WaitForChild("Modules")):WaitForChild("Net")):WaitForChild("RF/FruitCustomizerRF")):InvokeServer({
-	["StorageName"] = "Snow White";
-	["Type"] = "AuraSkin";
-	["Context"] = "Equip"
-}) ~= false then
-	Winter_Sky = true
-end
-if (((ReplicatedStorage:WaitForChild("Modules")):WaitForChild("Net")):WaitForChild("RF/FruitCustomizerRF")):InvokeServer({
-	["StorageName"] = "Rainbow Saviour";
-	["Type"] = "AuraSkin";
-	["Context"] = "Equip"
-}) ~= false then
-	Rainbow_Saviour = true
-end
-if Three_World and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TushitaProgress"))["OpenedDoor"] then
-	Unlock_Tushita_Quest = true
-end
-FuncA = function()
-	local L_198_ = {}
-	if Three_World then
-		if tostring(string["match"](tostring(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner")), "%d+")) == "nil" or tostring(string["match"](tostring(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner")), "%d+")) == nil then
-			ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner", true)
-		end
-	end
-	if Three_World then
-		if Utils["ffc"](Enemies, "Cake Prince") or Utils["ffc"](ReplicatedStorage, "Cake Prince") then
-			if Utils["ffc"](Enemies, "Cake Prince") then
-				for L_199_forvar0, L_200_forvar1 in pairs(Enemies:GetChildren()) do
-					local L_201_ = {}
-					L_201_[2], L_201_[3] = L_199_forvar0, L_200_forvar1
-					if L_201_[3]["Name"] == "Cake Prince" and L_201_[3]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"]()
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							TeleportTo(L_201_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-							Attack()
-						until not L_201_[3]["Parent"] or L_201_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-					end
-				end
-			elseif Utils["ffc"](ReplicatedStorage, "Cake Prince") then
-				for L_202_forvar0, L_203_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-					local L_204_ = {}
-					L_204_[1], L_204_[3] = L_202_forvar0, L_203_forvar1
-					if L_204_[3]["Name"] == "Cake Prince" and L_204_[3]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"]()
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							TeleportTo(L_204_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-							Attack()
-						until not L_204_[3]["Parent"] or L_204_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-					end
-				end
-			end
-		end
-	end
-	if Three_World then
-		if Enemies:FindFirstChild("rip_indra True Form") or ReplicatedStorage:FindFirstChild("rip_indra True Form") then
-			if not(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TushitaProgress"))["OpenedDoor"] then
-				local L_205_ = {}
-				L_205_[1] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TushitaProgress")
-				if not L_205_[1]["OpenedDoor"] then
-				    SendWebhook("Preparing to get Tusita...")
-					if Player["Backpack"]:FindFirstChild("Holy Torch") or Player["Character"]:FindFirstChild("Holy Torch") then
-						Utils["Equip"]("Holy Torch")
-						for L_206_forvar0 = 1, 5, 1 do
-							local L_207_ = {}
-							L_207_[1] = L_206_forvar0
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TushitaProgress", "Torch", L_207_[1])
-						end
-					elseif ReplicatedStorage:FindFirstChild("rip_indra True Form") or Enemies:FindFirstChild("rip_indra True Form") then
-						if Player["Backpack"]:FindFirstChild("Holy Torch") or Player["Character"]:FindFirstChild("Holy Torch") then
-							Utils["Equip"]("Holy Torch")
-							for L_208_forvar0 = 1, 5, 1 do
-								local L_209_ = {}
-								L_209_[1] = L_208_forvar0
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TushitaProgress", "Torch", L_209_[1])
-							end
-						elseif ReplicatedStorage:FindFirstChild("rip_indra True Form") or Enemies:FindFirstChild("rip_indra True Form") then
-							task["spawn"](function()
-								repeat
-									Utils["wt"]()
-									VirtualInputManager:SendKeyEvent(true, "Space", false, game)
-									Utils["wt"](.3)
-									VirtualInputManager:SendKeyEvent(false, "Space", false, game)
-								until Player["Backpack"]:FindFirstChild("Holy Torch") or Player["Character"]:FindFirstChild("Holy Torch") or not ReplicatedStorage:FindFirstChild("rip_indra True Form") and not Enemies:FindFirstChild("rip_indra True Form")
-							end)
-							repeat
-								Utils["wt"]()
-								Player["Character"]["HumanoidRootPart"]["CFrame"] = CFrame["new"](5714, 19, 254)
-							until Player["Backpack"]:FindFirstChild("Holy Torch") or Player["Character"]:FindFirstChild("Holy Torch") or not ReplicatedStorage:FindFirstChild("rip_indra True Form") and not Enemies:FindFirstChild("rip_indra True Form")
-							if Player["Backpack"]:FindFirstChild("Holy Torch") or Player["Character"]:FindFirstChild("Holy Torch") then
-								Utils["Equip"]("Holy Torch")
-								for L_210_forvar0 = 1, 5, 1 do
-									local L_211_ = {}
-									L_211_[2] = L_210_forvar0
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TushitaProgress", "Torch", L_211_[2])
-								end
-							end
-						end
-					end
-				elseif L_205_[1]["OpenedDoor"] then
-				    SendWebhook("Door to get tusita opened!")
-					Unlock_Tushita_Quest = true
-					return
-				end
-			else
-				if Enemies:FindFirstChild("rip_indra True Form") or ReplicatedStorage:FindFirstChild("rip_indra True Form") then
-					if Enemies:FindFirstChild("rip_indra True Form") then
-						for L_212_forvar0, L_213_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_214_ = {}
-							L_214_[3], L_214_[1] = L_212_forvar0, L_213_forvar1
-							if L_214_[1]["Name"] == "rip_indra True Form" and L_214_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"](.1)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									TeleportTo(L_214_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-									Attack()
-								until not L_214_[1]["Parent"] or L_214_[1]["Humanoid"]["Health"] <= 0
-							end
-						end
-					elseif ReplicatedStorage:FindFirstChild("rip_indra True Form") then
-						TeleportTo((ReplicatedStorage:FindFirstChild("rip_indra True Form"))["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0))
-					end
-				elseif Player["Backpack"]:FindFirstChild("God's Chalice") or Player["Character"]:FindFirstChild("God's Chalice") then
-					repeat
-						Utils["wt"](.1)
-						Oyster_H = false
-						Hot_pink_H = false
-						Really_red_H = false
-						for L_215_forvar0, L_216_forvar1 in pairs(Workspace["Map"]["Boat Castle"]["Summoner"]["Circle"]:GetChildren()) do
-							local L_217_ = {}
-							L_217_[1], L_217_[2] = L_215_forvar0, L_216_forvar1
-							if L_217_[2]["Name"] == "Part" and (tostring(L_217_[2]["BrickColor"]) == "Oyster" and tostring(L_217_[2]["Part"]["BrickColor"]) == "Lime green") then
-								Oyster_H = true
-							end
-						end
-						for L_218_forvar0, L_219_forvar1 in pairs(Workspace["Map"]["Boat Castle"]["Summoner"]["Circle"]:GetChildren()) do
-							local L_220_ = {}
-							L_220_[3], L_220_[1] = L_218_forvar0, L_219_forvar1
-							if L_220_[1]["Name"] == "Part" and (tostring(L_220_[1]["BrickColor"]) == "Hot pink" and tostring(L_220_[1]["Part"]["BrickColor"]) == "Lime green") then
-								Hot_pink_H = true
-							end
-						end
-						for L_221_forvar0, L_222_forvar1 in pairs(Workspace["Map"]["Boat Castle"]["Summoner"]["Circle"]:GetChildren()) do
-							local L_223_ = {}
-							L_223_[1], L_223_[3] = L_221_forvar0, L_222_forvar1
-							if L_223_[3]["Name"] == "Part" and (tostring(L_223_[3]["BrickColor"]) == "Really red" and tostring(L_223_[3]["Part"]["BrickColor"]) == "Lime green") then
-								Really_red_H = true
-							end
-						end
-						if Oyster_H and (Hot_pink_H and Really_red_H) then
-							repeat
-								Utils["wt"](.1)
-								Utils["Equip"]("God's Chalice")
-								TeleportTo(CFrame["new"](-5561.06738, 314.375793, -2663.88892, -0.304127187, -0.00254100002, .952628076, .000226983335, .999996245, .00273981248, -0.952631414, .00104948215, -0.304125458), 1.5)
-							until (Vector3["new"](-5561.06738, 314.375793, -2663.88892) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5
-							Utils["wt"](1)
-						else
-							if Player["Backpack"]:FindFirstChild("God's Chalice") or Player["Character"]:FindFirstChild("God's Chalice") then
-								repeat
-									Utils["wt"](.1)
-									Attack()
-									TeleportTo(CFrame["new"](-5561.06738, 314.375793, -2663.88892, -0.304127187, -0.00254100002, .952628076, .000226983335, .999996245, .00273981248, -0.952631414, .00104948215, -0.304125458), 1.5)
-								until (Vector3["new"](-5561.06738, 314.375793, -2663.88892) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5
-								if Snow_White and not Oyster_H then
-									for L_224_forvar0, L_225_forvar1 in pairs(Workspace["Map"]["Boat Castle"]["Summoner"]["Circle"]:GetChildren()) do
-										local L_226_ = {}
-										L_226_[3], L_226_[2] = L_224_forvar0, L_225_forvar1
-										if L_226_[2]["Name"] == "Part" and tostring(L_226_[2]["BrickColor"]) == "Oyster" then
-											if tostring(L_226_[2]["Part"]["BrickColor"]) ~= "Lime green" then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("activateColor", "Snow White")
-												Utils["wt"](1)
-												repeat
-													Utils["wt"]()
-													if not Utils["ffc"](Player["Character"], "HasBuso") then
-														Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-													end
-													TeleportTo(L_226_[2]["Part"]["CFrame"], 1.5)
-												until tostring(L_226_[2]["Part"]["BrickColor"]) == "Lime green"
-												Oyster_H = true
-											end
-										end
-									end
-								end
-								if Pure_Red_H and not Really_red_H then
-									for L_227_forvar0, L_228_forvar1 in pairs(Workspace["Map"]["Boat Castle"]["Summoner"]["Circle"]:GetChildren()) do
-										local L_229_ = {}
-										L_229_[1], L_229_[2] = L_227_forvar0, L_228_forvar1
-										if L_229_[2]["Name"] == "Part" and tostring(L_229_[2]["BrickColor"]) == "Really red" then
-											if tostring(L_229_[2]["Part"]["BrickColor"]) ~= "Lime green" then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("activateColor", "Pure Red")
-												Utils["wt"](1)
-												repeat
-													Utils["wt"]()
-													if not Utils["ffc"](Player["Character"], "HasBuso") then
-														Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-													end
-													TeleportTo(L_229_[2]["Part"]["CFrame"], 1.5)
-												until tostring(L_229_[2]["Part"]["BrickColor"]) == "Lime green"
-												Really_red_H = true
-											end
-										end
-									end
-								end
-								if Winter_Sky and not Hot_pink_H then
-									for L_230_forvar0, L_231_forvar1 in pairs(Workspace["Map"]["Boat Castle"]["Summoner"]["Circle"]:GetChildren()) do
-										local L_232_ = {}
-										L_232_[1], L_232_[2] = L_230_forvar0, L_231_forvar1
-										if L_232_[2]["Name"] == "Part" and tostring(L_232_[2]["BrickColor"]) == "Hot pink" then
-											if tostring(L_232_[2]["Part"]["BrickColor"]) ~= "Lime green" then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("activateColor", "Winter Sky")
-												Utils["wt"](1)
-												repeat
-													Utils["wt"]()
-													if not Utils["ffc"](Player["Character"], "HasBuso") then
-														Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-													end
-													TeleportTo(L_232_[2]["Part"]["CFrame"], 1.5)
-												until tostring(L_232_[2]["Part"]["BrickColor"]) == "Lime green"
-												Hot_pink_H = true
-											end
-										end
-									end
-								end
-								Utils["Equip"]("God's Chalice")
-								TeleportTo(CFrame["new"](-5561.06738, 314.375793, -2663.88892, -0.304127187, -0.00254100002, .952628076, .000226983335, .999996245, .00273981248, -0.952631414, .00104948215, -0.304125458), 1.5)
-								if TimeLoaderx == nil or tick() - TimeLoaderx > 10 then
-									TimeLoaderx = tick()
-									ReplicatedStorage[TableConcat({
-										"DefaultChatSystemCha",
-										"tEvents"
-									})]["SayMessageRequest"]:FireServer(TableConcat({
-										"I have God Chalice. ",
-										"I Can't Spawn Boss A";
-										"dmin,pls help me"
-									}), "All")
-								end
-							end
-						end
-					until not Player["Backpack"]:FindFirstChild("God's Chalice") and not Player["Character"]:FindFirstChild("God's Chalice")
-				end
-			end
-		end
-	end
-	if Three_World then
-		if Enemies:FindFirstChild("rip_indra True Form") or ReplicatedStorage:FindFirstChild("rip_indra True Form") then
-		    SendWebhook("rip_indra True Form Spawned!")
-			if Enemies:FindFirstChild("rip_indra True Form") then
-				for L_233_forvar0, L_234_forvar1 in pairs(Enemies:GetChildren()) do
-					local L_235_ = {}
-					L_235_[1], L_235_[3] = L_233_forvar0, L_234_forvar1
-					if L_235_[3]["Name"] == "rip_indra True Form" and L_235_[3]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"](.1)
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							TeleportTo(L_235_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-							Attack()
-						until not L_235_[3]["Parent"] or L_235_[3]["Humanoid"]["Health"] <= 0
-						SendWebhook("Done Attack rip_indra!")
-					end
-				end
-			elseif ReplicatedStorage:FindFirstChild("rip_indra True Form") then
-				TeleportTo((ReplicatedStorage:FindFirstChild("rip_indra True Form"))["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0))
-			end
-		end
-	end
-	L_198_[2] = false
-	if Three_World and not Mirror_Fractal_H then
-		if Utils["ffc"](Player["Backpack"], "Sweet Chalice") or Utils["ffc"](Player["Character"], "Sweet Chalice") or Utils["ffc"](Player["Backpack"], "God's Chalice") or Utils["ffc"](Player["Character"], "God's Chalice") or Utils["ffc"](Enemies, "Dough King") or Utils["ffc"](ReplicatedStorage, "Dough King") then
-			repeat
-				wait()
-				for L_236_forvar0, L_237_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-					local L_238_ = {}
-					L_238_[2], L_238_[3] = L_236_forvar0, L_237_forvar1
-					if L_238_[3]["Type"] == "Material" then
-						if L_238_[3]["Name"] == "Mirror Fractal" then
-							Mirror_Fractal_H = true
-						end
-					end
-				end
-				if Utils["ffc"](Enemies, "Dough King") or Utils["ffc"](ReplicatedStorage, "Dough King") then
-				    SendWebhook("Dough King Spawned!")
-					if Utils["ffc"](Enemies, "Dough King") then
-						for L_239_forvar0, L_240_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_241_ = {}
-							L_241_[2], L_241_[1] = L_239_forvar0, L_240_forvar1
-							if L_241_[1]["Name"] == "Dough King" and L_241_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									wait(.1)
-									TeleportTo(L_241_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-									Attack()
-								until not L_241_[1]["Parent"] or L_241_[1]["Humanoid"]["Health"] <= 0
-								SendWebhook("Done attack Dough King")
-								for L_242_forvar0, L_243_forvar1 in pairs((game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-									local L_244_ = {}
-									L_244_[3], L_244_[1] = L_242_forvar0, L_243_forvar1
-									if L_244_[1]["Type"] == "Material" then
-										if L_244_[1]["Name"] == "Mirror Fractal" then
-											Mirror_Fractal_H = true
-											SendWebhook("Obtained Mirror Fractal!")
-										end
-									end
-								end
-								return
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Dough King") then
-						TeleportTo((game["ReplicatedStorage"]:FindFirstChild("Dough King"))["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-					end
-				elseif Utils["ffc"](Player["Backpack"], "Sweet Chalice") or Utils["ffc"](Player["Character"], "Sweet Chalice") and not Mirror_Fractal_H then
-					if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](-2286.6843261719, 146.56562805176, -12226.881835938))["Magnitude"] >= 1800 then
-						repeat
-							wait()
-							TeleportTo(CFrame["new"](-2286.6843261719, 146.56562805176, -12226.881835938), 1.5)
-						until (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](-2286.6843261719, 146.56562805176, -12226.881835938))["Magnitude"] <= 3
-					elseif (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](-2286.6843261719, 146.56562805176, -12226.881835938))["Magnitude"] < 1800 then
-						Monster = nil
-						for L_245_forvar0 = 1500, 0, -300 do
-							local L_246_ = {}
-							L_246_[1] = L_245_forvar0
-							Utils["GetMonster"](L_246_[1])
-						end
-						if Monster ~= nil and Monster["Humanoid"]["Health"] > 0 then
-							local L_247_ = {}
-							PosMon_X = Monster["HumanoidRootPart"]["CFrame"]
-							StatrMagnet = true
-							repeat
-								wait()
-								TeleportTo(Monster["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -17, 0), 1.5)
-								Attack()
-							until not Monster["Parent"] or Monster["Humanoid"]["Health"] <= 0
-							StatrMagnet = false
-							L_247_[1] = tostring(string["match"](tostring(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner")), "%d+"))
-							if L_247_[1] == "nil" or L_247_[1] == nil then
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner", true)
-							end
-						elseif Monster == nil then
-							for L_248_forvar0 = 1500, 0, -300 do
-								local L_249_ = {}
-								L_249_[2] = L_248_forvar0
-								Utils["GetMonster"](L_249_[2])
-							end
-							if Monster == nil then
-								TeleportTo(CFrame["new"](-2286.6843261719, 146.56562805176, -12226.881835938), 1.5)
-							end
-						end
-					end
-				elseif Utils["ffc"](Player["Backpack"], "God's Chalice") or Utils["ffc"](Player["Character"], "God's Chalice") and not Mirror_Fractal_H then
-					if Utils["CheckItem"]("Conjured Cocoa") >= 10 then
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("SweetChaliceNpc")
-					elseif Utils["CheckItem"]("Conjured Cocoa") < 10 then
-					    SendWebhook("Farming Conjured Cocoa (Attack Dough King)")
-						if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](658.22302246094, 24.734258651733, -12541.991210938))["Magnitude"] >= 1800 then
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](658.22302246094, 24.734258651733, -12541.991210938), 1.5)
-							until (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](658.22302246094, 24.734258651733, -12541.991210938))["Magnitude"] <= 3 or Utils["CheckItem"]("Conjured Cocoa") >= 10
-						elseif (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](658.22302246094, 24.734258651733, -12541.991210938))["Magnitude"] < 1800 then
-							Monster = nil
-							for L_250_forvar0 = 1500, 0, -300 do
-								local L_251_ = {}
-								L_251_[1] = L_250_forvar0
-								Utils["GetMonster"](L_251_[1])
-							end
-							if Monster ~= nil and Monster["Humanoid"]["Health"] > 0 then
-								PosMon_X = Monster["HumanoidRootPart"]["CFrame"]
-								StatrMagnet = true
-								repeat
-									wait()
-									TeleportTo(Monster["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -17, 0), 1.5)
-									Attack()
-								until not Monster["Parent"] or Monster["Humanoid"]["Health"] <= 0
-								StatrMagnet = false
-							elseif Monster == nil then
-								for L_252_forvar0 = 1500, 0, -300 do
-									local L_253_ = {}
-									L_253_[2] = L_252_forvar0
-									Utils["GetMonster"](L_253_[2])
-								end
-								if Monster == nil then
-									TeleportTo(CFrame["new"](658.22302246094, 24.734258651733, -12541.991210938), 1.5)
-								end
-							end
-						end
-					end
-				elseif not Enemies:FindFirstChild("Dough King") and not ReplicatedStorage:FindFirstChild("Dough King") then
-					L_198_[2] = true
-				end
-			until Mirror_Fractal_H or L_198_[2]
-		end
-	end
-	if Three_World then
-		if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("EliteHunter") ~= TableConcat({
-			"I don't have anythin";
-			"g for you right now.",
-			" Come back later."
-		}) then
-			ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("EliteHunter")
-			for L_254_forvar0, L_255_forvar1 in ipairs({
-				"Diablo";
-				"Deandre";
-				"Urban"
-			}) do
-				local L_256_ = {}
-				L_256_[2], L_256_[1] = L_254_forvar0, L_255_forvar1
-				L_256_[3] = Enemies:FindFirstChild(L_256_[1]) or ReplicatedStorage:FindFirstChild(L_256_[1])
-				if L_256_[3] and (L_256_[3]:FindFirstChild("HumanoidRootPart") and (L_256_[3]:FindFirstChild("Humanoid") and L_256_[3]["Humanoid"]["Health"] > 0)) then
-					repeat
-						Utils["wt"]()
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("EliteHunter")
-						TeleportTo(L_256_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-						if not Utils["ffc"](Player["Character"], "HasBuso") then
-							Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-						end
-						Attack()
-					until not L_256_[3]["Parent"] or L_256_[3]["Humanoid"]["Health"] <= 0
-				end
-			end
-		end
-	end
-	if New_World then
-		if Utils["ffc"](Enemies, "Darkbeard") or Utils["ffc"](ReplicatedStorage, "Darkbeard") then
-		    SendWebhook("Attack Darkbeard...")
-			if Utils["ffc"](Enemies, "Darkbeard") then
-				for L_257_forvar0, L_258_forvar1 in pairs(Enemies:GetChildren()) do
-					local L_259_ = {}
-					L_259_[3], L_259_[1] = L_257_forvar0, L_258_forvar1
-					if L_259_[1]["Name"] == "Darkbeard" and L_259_[1]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"]()
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							TeleportTo(L_259_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-							Attack()
-						until not L_259_[1]["Parent"] or L_259_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-					end
-				end
-			elseif Utils["ffc"](ReplicatedStorage, "Darkbeard") then
-				for L_260_forvar0, L_261_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-					local L_262_ = {}
-					L_262_[2], L_262_[1] = L_260_forvar0, L_261_forvar1
-					if L_262_[1]["Name"] == "Darkbeard" and L_262_[1]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"]()
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								Player["Character"]["HumanoidRootPart"]["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							TeleportTo(L_262_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, -30, 0), 1.5)
-							Attack()
-						until not L_262_[1]["Parent"] or L_262_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-					end
-				end
-			end
-		end
-	end
-	if New_World then
-		if Utils["ffc"](Enemies, "Core") or Utils["ffc"](ReplicatedStorage, "Core") then
-			if Utils["ffc"](Enemies, "Core") then
-				for L_263_forvar0, L_264_forvar1 in pairs(Enemies:GetChildren()) do
-					local L_265_ = {}
-					L_265_[1], L_265_[2] = L_263_forvar0, L_264_forvar1
-					if L_265_[2]["Name"] == "Core" and L_265_[2]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"]()
-							TeleportTo(L_265_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							Attack()
-						until not L_265_[2]["Parent"] or L_265_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-					end
-				end
-			elseif Utils["ffc"](ReplicatedStorage, "Core") then
-				for L_266_forvar0, L_267_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-					local L_268_ = {}
-					L_268_[3], L_268_[2] = L_266_forvar0, L_267_forvar1
-					if L_268_[2]["Name"] == "Core" and L_268_[2]["Humanoid"]["Health"] > 0 then
-						repeat
-							Utils["wt"]()
-							TeleportTo(L_268_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							Attack()
-						until not L_268_[2]["Parent"] or L_268_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-					end
-				end
-			end
-		end
-	end
-	FarmUpdate()
-	if Quest ~= nil then
-		return
-	end
-	if Level["Value"] < 2800 or not Three_World then
-		if Level["Value"] <= 9 and (not New_World and not Three_World) then
-			if Player["PlayerGui"]["Main"]["Quest"]["Visible"] then
-				if Utils["sf"](Player["PlayerGui"]["Main"]["Quest"]["Container"]["QuestTitle"]["Title"]["Text"], tostring(NameEnemy)) then
-					if Utils["ffc"](Enemies, Enemy) then
-						for L_269_forvar0, L_270_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_271_ = {}
-							L_271_[1], L_271_[2] = L_269_forvar0, L_270_forvar1
-							if L_271_[2]["Name"] == Enemy and (Utils["ffc"](L_271_[2], "Humanoid") and (L_271_[2]["Humanoid"]["Health"] > 0 and Utils["ffc"](L_271_[2], "HumanoidRootPart"))) then
-								repeat
-									Utils["wt"]()
-									Utils["BN"](L_271_[2]["Name"])
-									TeleportTo(L_271_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until L_271_[2]["Humanoid"]["Health"] <= 0 or not Enemies:FindFirstChild(Enemy) or not(Player["PlayerGui"]["Main"]:FindFirstChild("Quest"))["Visible"] or not(getgenv())["AutoFarm"] or Quest ~= nil
-							end
-						end
-					else
-						TeleportTo(EnemyPos, 1.5)
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("AbandonQuest")
-				end
-			else
-				repeat
-					Utils["wt"]()
-					TeleportTo(QuestPos, 1.5)
-					if (QuestPos["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5 and (Player["Character"]:WaitForChild("Humanoid"))["Health"] > 0 then
-						Utils["wt"]();
-						((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("StartQuest", QuestName, QuestNumber)
-					end
-				until (Player["PlayerGui"]["Main"]:FindFirstChild("Quest"))["Visible"] or not(getgenv())["AutoFarm"] or Quest ~= nil
-			end
-		elseif Level["Value"] >= 9 and (Level["Value"] <= 70 and (not New_World and not Three_World)) then
-			if ((CFrame["new"](-7895, 5546, -380))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 1000 then
-				if Utils["ffc"](Enemies, "Shanda") then
-					for L_272_forvar0, L_273_forvar1 in pairs(Enemies:GetChildren()) do
-						local L_274_ = {}
-						L_274_[2], L_274_[1] = L_272_forvar0, L_273_forvar1
-						if L_274_[1]["Name"] == "Shanda" and (L_274_[1]:FindFirstChild("Humanoid") and L_274_[1]["Humanoid"]["Health"] > 0) then
-							repeat
-								Utils["wt"]()
-								SROP = true
-								TeleportTo(L_274_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-								Attack()
-								Utils["BN"](L_274_[1]["Name"])
-							until not L_274_[1]["Parent"] or L_274_[1]["Humanoid"]["Health"] <= 0 or Level["Value"] >= 91 or not(getgenv())["AutoFarm"] or Quest ~= nil
-						end
-					end
-				else
-					TeleportTo(CFrame["new"](-7757, 5582, -481), 1.5)
-				end
-			else
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("requestEntrance", Vector3["new"](-7894.6176757813, 5547.1416015625, -380.29119873047))
-			end
-        if Level["Value"] >= 2600 then
-            if not IsInSubmerged() then
-                repeat
-                    Utils["wt"]()
-                    TeleportTo(CFrame.new(-16269.16, 25.26, 1373.38), 1.5)
-                until (Player.Character.HumanoidRootPart.Position 
-                    - Vector3.new(-16269.16, 25.26, 1373.38)).Magnitude <= 5
-                    or not getgenv().AutoFarm
-        
-                Utils["wt"](0.5)
-        
-                game:GetService("ReplicatedStorage").Modules.Net["RF/SubmarineWorkerSpeak"]:InvokeServer("TravelToSubmergedIsland")
-        
-                repeat
-                    wait()
-                until IsInSubmerged() or not getgenv().AutoFarm
-            end
-        end
-		elseif Level["Value"] >= 71 then
-			if Player["PlayerGui"]["Main"]["Quest"]["Visible"] then
-				if Utils["sf"](Player["PlayerGui"]["Main"]["Quest"]["Container"]["QuestTitle"]["Title"]["Text"], tostring(NameEnemy)) then
-					if Utils["ffc"](Enemies, Enemy) then
-						for L_275_forvar0, L_276_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_277_ = {}
-							L_277_[1], L_277_[2] = L_275_forvar0, L_276_forvar1
-							if L_277_[2]["Name"] == Enemy and (L_277_[2]:FindFirstChild("Humanoid") and (L_277_[2]["Humanoid"]["Health"] > 0 and L_277_[2]:FindFirstChild("HumanoidRootPart"))) then
-								repeat
-									Utils["wt"]()
-									SROP = false
-									TeleportTo(L_277_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Utils["BN"](L_277_[2]["Name"])
-									Attack()
-								until L_277_[2]["Humanoid"]["Health"] <= 0 or not Enemies:FindFirstChild(Enemy) or not(Player["PlayerGui"]["Main"]:FindFirstChild("Quest"))["Visible"] or Quest ~= nil
-							end
-						end
-					else
-						TeleportTo(EnemyPos, 1.5)
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("AbandonQuest")
-				end
-			else
-				repeat
-					Utils["wt"]()
-					TeleportTo(QuestPos, 1.5)
-					if (QuestPos["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5 and (Player["Character"]:WaitForChild("Humanoid"))["Health"] > 0 then
-						Utils["wt"](.5);
-						((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("StartQuest", QuestName, QuestNumber)
-					end
-				until (Player["PlayerGui"]["Main"]:FindFirstChild("Quest"))["Visible"] or not(getgenv())["AutoFarm"] or Quest ~= nil
-			end
-		end
-	elseif Level["Value"] >= 2800 and Three_World then
-		SROP = false
-		if Utils["ffc"](ReplicatedStorage, "Cake Prince") then
-			for L_278_forvar0, L_279_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-				local L_280_ = {}
-				L_280_[1], L_280_[2] = L_278_forvar0, L_279_forvar1
-				if L_280_[2]["Name"] == "Cake Prince" and (L_280_[2]:FindFirstChild("Humanoid") and (L_280_[2]:FindFirstChild("Humanoid"))["Health"] > 0) then
-					TeleportTo(L_280_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 42, 10), 1.5)
-				end
-			end
-		elseif Utils["ffc"](Enemies, "Cake Prince") then
-			for L_281_forvar0, L_282_forvar1 in pairs(Enemies:GetChildren()) do
-				local L_283_ = {}
-				L_283_[1], L_283_[2] = L_281_forvar0, L_282_forvar1
-				if L_283_[2]["Name"] == "Cake Prince" and (L_283_[2]:FindFirstChild("Humanoid") and (L_283_[2]:FindFirstChild("Humanoid"))["Health"] > 0) then
-					TeleportTo(L_283_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 42, 10), 1.5)
-				end
-			end
-		else
-			if tostring(string["match"](tostring(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner")), "%d+")) == "nil" or tostring(string["match"](tostring(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner")), "%d+")) == nil then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CakePrinceSpawner", true)
-			end
-			if Utils["ffc"](Enemies, "Cookie Crafter") or Utils["ffc"](Enemies, "Cake Guard") or Utils["ffc"](Enemies, "Baking Staff") or Utils["ffc"](Enemies, "Head Baker") then
-				for L_284_forvar0, L_285_forvar1 in pairs(Enemies:GetChildren()) do
-					local L_286_ = {}
-					L_286_[1], L_286_[2] = L_284_forvar0, L_285_forvar1
-					if L_286_[2]["Name"] == "Cookie Crafter" or L_286_[2]["Name"] == "Cake Guard" or L_286_[2]["Name"] == "Baking Staff" or L_286_[2]["Name"] == "Head Baker" then
-						repeat
-							Utils["wt"]()
-							TeleportTo(L_286_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-							if not Utils["ffc"](Player["Character"], "HasBuso") then
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-							end
-							Utils["BN"](L_286_[2]["Name"])
-							Attack()
-						until L_286_[2]["Humanoid"]["Health"] <= 0 or not Enemies:FindFirstChild(Enemy) or not(Player["PlayerGui"]["Main"]:FindFirstChild("Quest"))["Visible"] or Quest ~= nil
-					end
-				end
-			else
-				TeleportTo(CFrame["new"](-2091.9118652344, 70.008842468262, -12142.8359375), 1.5)
-			end
-		end
-	end
-end
-FuncB = function()
-    if noFruit then return end
-
-    for _, tool in pairs(Player["Backpack"]:GetChildren()) do
-        if tool:IsA("Tool")
-        and tool:GetAttribute("OriginalName") ~= nil
-        and Utils["sf"](tool.Name, "Fruit")
-        and not Utils["IsInList"](Utils["GetType"](), tool:GetAttribute("OriginalName")) then
-
-            local fruitName = tool:GetAttribute("OriginalName")
-
-            game.ReplicatedStorage.Remotes.CommF_:InvokeServer(
-                "StoreFruit",
-                fruitName,
-                tool
-            )
-
-            if not table.find(fruit_collected, fruitName) then
-                table.insert(fruit_collected, fruitName)
-                SendWebhook("Stored Fruit:\n" .. fruitName)
-            end
-
-            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("GetFruits", false)
-        end
-    end
-
-    for _, tool in pairs(Player["Character"]:GetChildren()) do
-        if tool:IsA("Tool")
-        and tool:GetAttribute("OriginalName") ~= nil
-        and Utils["sf"](tool.Name, "Fruit")
-        and not Utils["IsInList"](Utils["GetType"](), tool:GetAttribute("OriginalName")) then
-
-            local fruitName = tool:GetAttribute("OriginalName")
-
-            game.ReplicatedStorage.Remotes.CommF_:InvokeServer(
-                "StoreFruit",
-                fruitName,
-                tool
-            )
-
-            if not table.find(fruit_collected, fruitName) then
-                table.insert(fruit_collected, fruitName)
-                SendWebhook("Stored Fruit:\n" .. fruitName)
-            end
-
-            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("GetFruits", false)
-        end
-    end
-end
-_G["Ew"] = true
-Ewx = true
-task["spawn"](function()
-	while Utils["wt"]() do
-		if _G["Ew"] then
-			Attack()
-		else
-			FuncB()
-			if Ewx then
-				Delay = 0
-			else
-				Delay = .2
-			end
-		end
-	end
-end)
-task["spawn"](function()
-	while Utils["wt"](1) do
-		xpcall(function()
-			if not Black_Leg_C then
-				repeat
-					Utils["wt"](Delay)
-    	            if Old_World then
-                        TeleportTo(CFrame.new(-984.7499389648438, 14.066271781921387, 3987.7001953125))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif New_World then
-                        TeleportTo(CFrame.new(-4996.2734375, 42.98426055908203, -4500.1748046875))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif Three_World then
-                        TeleportTo(CFrame.new(-5043.21142578125, 371.627197265625, -3182.06689453125))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					Attack()
-					Utils["wt"](.05)
-					if Utils["ffc"](Player["Character"], "Black Leg") or Utils["ffc"](Player["Backpack"], "Black Leg") and not Black_Leg_C then
-					    SendWebhook("Purchased Dark Step")
-						Black_Leg_C = true
-						Utils["Equip"]("Black Leg")
-					end
-				until Black_Leg_C
-			end
-			if not Electro_C then
-				repeat
-					Utils["wt"](Delay)
-					Attack()
-					VirtualInputManager:SendKeyEvent(true, "V", false, game)
-					wait(.5)
-					VirtualInputManager:SendKeyEvent(false, "V", false, game)
-					if Utils["ffc"](Player["Character"], "Black Leg") and (Player["Character"]["Black Leg"]["Level"]["Value"] >= 300 and not Electro_C) then
-						if Player["Character"]["Black Leg"]["Level"]["Value"] >= 400 then
-							Black_Leg_C_M = true
-						end
-						Electro_C = true
-						Utils["wt"](.05)
-                        if World1 then
-                            topos(CFrame.new(-5382.93212890625, 14.407341957092285, -2150.54638671875))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectro")
-                            task.wait(0.5)
-                            SendWebhook("Purchased Electro!")
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif World2 then
-                            topos(CFrame.new(-4947.47998046875, 42.54825973510742, -4439.400390625))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectro")
-                            task.wait(0.5)
-                            SendWebhook("Purchased Electro!")
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif World3 then
-                            topos(CFrame.new(-5024.8525390625, 371.627197265625, -3190.572509765625))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectro")
-                            task.wait(0.5)
-                            SendWebhook("Purchased Electro!")
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        end
-					end
-				until Electro_C
-			end
-			if not Fishman_Karate_C then
-				repeat
-					Utils["wt"](Delay)
-					Attack()
-					if Utils["ffc"](Player["Character"], "Electro") and (Player["Character"]["Electro"]["Level"]["Value"] >= 300 and not Fishman_Karate_C) then
-						if Player["Character"]["Electro"]["Level"]["Value"] >= 400 then
-							Electro_C_M = true
-						end
-						Fishman_Karate_C = true
-						
-						Utils["wt"](.05)
-                        if World1 then
-                            topos(CFrame.new(4050.31103515625, -1.6880035400390625, -1814.1240234375))
-                            task.wait(2)
-                            topos(CFrame.new(61581.8047, 18.8965912, 987.832703))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                            task.wait(0.5)
-                            SendWebhook("Purchased Fishman Karate!")
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif World2 then
-                            topos(CFrame.new(-4992.630859375, 43.027259826660156, -4460.2197265625))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                            task.wait(0.5)
-                            SendWebhook("Purchased Fishman Karate!")
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif World3 then
-                            topos(CFrame.new(-5024.8525390625, 371.627197265625, -3190.572509765625))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                            task.wait(0.5)
-                            SendWebhook("Purchased Fishman Karate!")
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        end
-					end
-				until Fishman_Karate_C
-			end
-			if not Fishman_Karate_C_M then
-				repeat
-					local L_295_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World1 then
-                        topos(CFrame.new(4050.31103515625, -1.6880035400390625, -1814.1240234375))
-                        task.wait(2)
-                        topos(CFrame.new(61581.8047, 18.8965912, 987.832703))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World2 then
-                        topos(CFrame.new(-4992.630859375, 43.027259826660156, -4460.2197265625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-5024.8525390625, 371.627197265625, -3190.572509765625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_295_[2] = Player["Character"]:FindFirstChild("Fishman Karate")
-					if L_295_[2] and (L_295_[2]:FindFirstChild("Level") and L_295_[2]["Level"]["Value"] >= 400) then
-						Fishman_Karate_C_M = true
-					end
-				until Fishman_Karate_C_M
-			end
-			Utils["wt"](Delay)
-			if not Dragon_Claw_C then
-				local L_296_ = {}
-                if World2 then
-                    topos(CFrame.new(701.625, 187.27423095703125, 655.7734985351562))
-                    Player.Character.Humanoid.PlatformStand = false
-                    Player.Character.HumanoidRootPart.Anchored = true
-                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                    task.wait(0.5)
-                    SendWebhook("Purchased Dragon Breath!")
-                    Player.Character.HumanoidRootPart.Anchored = false
-                elseif World3 then
-                    topos(CFrame.new(-4982.60693359375, 371.627197265625, -3209.21337890625))
-                    Player.Character.Humanoid.PlatformStand = false
-                    Player.Character.HumanoidRootPart.Anchored = true
-                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                    task.wait(0.5)
-                    SendWebhook("Purchased Dragon Breath?")
-                    Player.Character.HumanoidRootPart.Anchored = false
-                end
-				if L_296_[2] == 1 or L_296_[2] == 2 then
-					pcall(function()
-						if Player["Character"]["Fishman Karate"]["Level"]["Value"] >= 400 then
-							Fishman_Karate_C_M = true
-						end
-					end)
-					Dragon_Claw_C = true
-				end
-			end
-			repeat
-				task["wait"](Delay)
-				Attack()
-				if not Super_human then
-					if Dragon_Claw_C then
-						if Utils["ffc"](Player["Character"], "Dragon Claw") and Player["Character"]["Dragon Claw"]["Level"]["Value"] >= 300 then
-							local L_297_ = {}
-							if Player["Character"]["Dragon Claw"]["Level"]["Value"] >= 400 then
-								Dragon_Claw_C_M = true
-							end
-							L_297_[2] = {
-								[1] = "BuySuperhuman"
-							}
-							if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer(unpack(L_297_[2])) == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer(unpack(L_297_[2])) == 2 then
-								Super_human = true
-								if Player["Character"]["Superhuman"]["Level"]["Value"] >= 400 then
-									Super_humanw_C_M = true
-								end
-							end
-						end
-					end
-				end
-			until Super_human
-			if not Death_Step then
-				if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyDeathStep") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyDeathStep") == 2 then
-					Death_Step = true
-				end
-			end
-			if Black_Leg_C_M then
-				repeat
-					local L_298_ = {}
-					task["wait"](Delay)
-					Attack()
-					L_298_[1] = Player["Character"]:FindFirstChild("Death Step")
-					if L_298_[1] and (L_298_[1]:FindFirstChild("Level") and L_298_[1]["Level"]["Value"] >= 400) then
-						local L_299_ = {}
-                        if Old_World then
-                            TeleportTo(CFrame.new(-984.7499389648438, 14.066271781921387, 3987.7001953125))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                            task.wait(0.5)
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif New_World then
-                            TeleportTo(CFrame.new(-4996.2734375, 42.98426055908203, -4500.1748046875))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                            task.wait(0.5)
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif Three_World then
-                            TeleportTo(CFrame.new(-5043.21142578125, 371.627197265625, -3182.06689453125))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                            task.wait(0.5)
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        end
-						L_299_[1] = Player["Character"]:FindFirstChild("Black Leg")
-						if L_299_[1] and (L_299_[1]:FindFirstChild("Level") and L_299_[1]["Level"]["Value"] >= 400) then
-							Black_Leg_C_M = true
-						end
-					end
-				until Black_Leg_C_M
-			end
-			if not Death_Step_C_M then
-				repeat
-					local L_300_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World2 then
-                        topos(CFrame.new(6356.86474609375, 296.94586181640625, -6761.203125))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDeathStep")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-4999.23193359375, 313.9510192871094, -3221.530517578125))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDeathStep")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_300_[1] = Player["Character"]:FindFirstChild("Death Step")
-					if L_300_[1] and (L_300_[1]:FindFirstChild("Level") and L_300_[1]["Level"]["Value"] >= 400) then
-						Death_Step_C_M = true
-					end
-				until Death_Step_C_M
-			end
-			if not Electro_C_M then
-				repeat
-					local L_301_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World1 then
-                        topos(CFrame.new(-5382.93212890625, 14.407341957092285, -2150.54638671875))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectro")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World2 then
-                        topos(CFrame.new(-4947.47998046875, 42.54825973510742, -4439.400390625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectro")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-5024.8525390625, 371.627197265625, -3190.572509765625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectro")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_301_[1] = Player["Character"]:FindFirstChild("Electro")
-					if L_301_[1] and (L_301_[1]:FindFirstChild("Level") and L_301_[1]["Level"]["Value"] >= 400) then
-						Electro_C_M = true
-					end
-				until Electro_C_M
-			end
-			if not Fishman_Karate_C_M then
-				repeat
-					local L_302_ = {}
-					task["wait"](Delay)
-                    if World1 then
-                        topos(CFrame.new(4050.31103515625, -1.6880035400390625, -1814.1240234375))
-                        task.wait(2)
-                        topos(CFrame.new(61581.8047, 18.8965912, 987.832703))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World2 then
-                        topos(CFrame.new(-4992.630859375, 43.027259826660156, -4460.2197265625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-5024.8525390625, 371.627197265625, -3190.572509765625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					warn()
-					L_302_[1] = Player["Character"]:FindFirstChild("Fishman Karate")
-					if L_302_[1] and (L_302_[1]:FindFirstChild("Level") and L_302_[1]["Level"]["Value"] >= 400) then
-						Fishman_Karate_C_M = true
-					end
-				until Fishman_Karate_C_M
-			end
-			if not Dragon_Claw_C_M then
-				repeat
-					local L_303_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World2 then
-                        topos(CFrame.new(701.625, 187.27423095703125, 655.7734985351562))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-4982.60693359375, 371.627197265625, -3209.21337890625))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_303_[1] = Player["Character"]:FindFirstChild("Dragon Claw")
-					if L_303_[1] and (L_303_[1]:FindFirstChild("Level") and L_303_[1]["Level"]["Value"] >= 400) then
-						Dragon_Claw_C_M = true
-					end
-				until Dragon_Claw_C_M
-			end
-			if not Sharkman_Karate_C then
-				repeat
-					Utils["wt"](Delay)
-					Attack()
-                    if World2 then
-                        topos(CFrame.new(-2601.416259765625, 239.27285766601562, -10312.27734375))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-4971.24365234375, 314.0325622558594, -3223.034912109375))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					if Utils["ffc"](Player["Backpack"], "Sharkman Karate") or Utils["ffc"](Player["Character"], "Sharkman Karate") then
-						Sharkman_Karate_C = true
-					end
-				until Sharkman_Karate_C
-			end
-			if not Sharkman_Karate_C_M then
-				repeat
-					local L_304_ = {}
-					task["wait"](Delay)
-					Attack()
-        	        if World2 then
-                        topos(CFrame.new(-2601.416259765625, 239.27285766601562, -10312.27734375))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    elseif World3 then
-                        topos(CFrame.new(-4971.24365234375, 314.0325622558594, -3223.034912109375))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_304_[1] = Player["Character"]:FindFirstChild("Sharkman Karate")
-					if L_304_[1] and (L_304_[1]:FindFirstChild("Level") and L_304_[1]["Level"]["Value"] >= 400) then
-						Sharkman_Karate_C_M = true
-					end
-				until Sharkman_Karate_C_M
-			end
-			if not Electric_Claw_C then
-				repeat
-					task["wait"](Delay)
-					if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 2 then
-						Electric_Claw_C = true
-					end
-				until Electric_Claw_C
-			end
-			if not Electric_Claw_C_M then
-				repeat
-					local L_305_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World3 then
-                        Player.Character.Humanoid.PlatformStand = true
-                        topos(CFrame.new(-12551, 337, -7476))
-                        task.wait(1)
-                        topos(CFrame.new(-10370.771484375, 331.9684143066406, -10133.3828125))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectricClaw")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_305_[2] = Player["Character"]:FindFirstChild("Electric Claw")
-					if L_305_[2] and (L_305_[2]:FindFirstChild("Level") and L_305_[2]["Level"]["Value"] >= 400) then
-						Electric_Claw_C_M = true
-					end
-				until Electric_Claw_C_M
-			end
-			if not Dragon_Talon_C then
-				repeat
-					task["wait"](Delay)
-					if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyDragonTalon") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyDragonTalon") == 2 then
-						Dragon_Talon_C = true
-					end
-				until Dragon_Talon_C
-			end
-			if not Dragon_Talon_C_M then
-				repeat
-					local L_306_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World3 then
-                        Player.Character.Humanoid.PlatformStand = true
-                        topos(CFrame.new(5663, 1211, 861))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_306_[1] = Player["Character"]:FindFirstChild("Dragon Talon")
-					if L_306_[1] and (L_306_[1]:FindFirstChild("Level") and L_306_[1]["Level"]["Value"] >= 400) then
-						Dragon_Talon_C_M = true
-					end
-				until Dragon_Talon_C_M
-			end
-			if not God_Human_C then
-				repeat
-					task["wait"](Delay)
-					if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyGodhuman") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyGodhuman") == 2 then
-						God_Human_C = true
-					end
-				until God_Human_C
-			end
-			if not God_Human_C_M then
-				repeat
-					local L_307_ = {}
-					task["wait"](Delay)
-					Attack()
-                    if World3 then
-                        Player.Character.Humanoid.PlatformStand = true
-                        topos(CFrame.new(-12551, 337, -7476))
-                        task.wait(1)
-                        topos(CFrame.new(-13775.5732421875, 334.93670654296875, -9881.7685546875))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyGodhuman")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					L_307_[2] = Player["Character"]:FindFirstChild("Godhuman")
-					if L_307_[2] and (L_307_[2]:FindFirstChild("Level") and L_307_[2]["Level"]["Value"] >= 400) then
-						God_Human_C_M = true
-					end
-				until God_Human_C_M
-			end
-		end, warn)
-	end
-end);
-(getgenv())["AutoFarm"] = true
-if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuySharkmanKarate", true) ~= TableConcat({
-	"I lost my house keys",
-	", could you help me ";
-	"find them? Thanks."
-}) then
-	CheckFindWaterKey = true
-end
-if Level["Value"] >= 2000 and (getgenv())["Configs"]["Quest"]["RGB Haki"] then
-	if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("HornedMan", "Bet") == 1 then
-		RGB_Haki_H = true
-	end
-end
-FuncC = function()
-	if not Utils["gi"]("Cursed Dual Katana") then
-		if Utils["gi"]("Tushita") and Utils["gi"]("Yama") then
-			local L_308_ = {}
-			L_308_[1] = (game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("getInventory")
-			for L_309_forvar0, L_310_forvar1 in pairs(L_308_[1]) do
-				local L_311_ = {}
-				L_311_[3], L_311_[2] = L_309_forvar0, L_310_forvar1
-				if L_311_[2]["Type"] == "Sword" then
-					if L_311_[2]["Name"] == "Tushita" and L_311_[2]["Mastery"] >= 400 then
-						Tushita_M = true
-					elseif L_311_[2]["Name"] == "Yama" and L_311_[2]["Mastery"] >= 400 then
-						Yama_M = true
-					end
-				end
-			end
-			return Tushita_M and Yama_M
-		end
-	end
-	return false
-end
-task["spawn"](function()
-	while Utils["wt"]() do
-		xpcall(function()
-			if (getgenv())["AutoFarm"] then
-				local L_312_ = {}
-				Stop_Fast_Attack = false
-				if Level["Value"] >= 1500 or RainbowSaviour then
-					if (((ReplicatedStorage:WaitForChild("Modules")):WaitForChild("Net")):WaitForChild("RF/FruitCustomizerRF")):InvokeServer({
-						["StorageName"] = "Rainbow Saviour",
-						["Type"] = "AuraSkin";
-						["Context"] = "Equip"
-					}) ~= false then
-						(((ReplicatedStorage:WaitForChild("Modules")):WaitForChild("Net")):WaitForChild("RF/FruitCustomizerRF")):InvokeServer({
-							["StorageName"] = "Rainbow Saviour";
-							["Type"] = "AuraSkin";
-							["Context"] = "Equip"
-						})
-					end
-				end
-				L_312_[1] = false
-				if ((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("Cousin", "Buy") == 1 then
-					Utils["wt"](1)
-					FuncB()
-				else
-					for L_313_forvar0, L_314_forvar1 in pairs(Workspace:GetChildren()) do
-						local L_315_ = {}
-						L_315_[1], L_315_[3] = L_313_forvar0, L_314_forvar1
-						if L_315_[3]:GetAttribute("OriginalName") ~= nil and (Utils["sf"](L_315_[3]["Name"], "Fruit") and (L_315_[3]:IsA("Tool") and not Utils["IsInList"](Utils["GetType"](), L_315_[3]:GetAttribute("OriginalName")))) then
-							repeat
-								Utils["wt"](.1)
-								SetStatusFarm("Tween to " .. L_315_[3]["Name"])
-								TPZ(L_315_[3]["Handle"]["CFrame"])
-								L_312_[1] = true
-								FuncB()
-							until not L_315_[3] or game["Players"]["LocalPlayer"]["Backpack"]:FindFirstChild(L_315_[3]["Name"]) or Utils["IsInList"](Utils["GetType"](), L_315_[3]:GetAttribute("OriginalName")) or (L_315_[3]["Handle"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 10 or not(getgenv())["AutoFarm"]
-						end
-					end
-					if not L_312_[1] then
-						local L_316_ = {}
-						if Utils["tf"](Configs["Gun"], "Magma Blaster") and (Level["Value"] >= 200 and (not Utils["gi"]("Magma Blaster") and (Old_World and Utils["CheckBoss"]("Magma Admiral")))) then
-							Quest = "Magma Blaster"
-							return
-						end
-						if Utils["tf"](Configs["Gun"], "Bazooka") and (Level["Value"] >= 200 and (not Utils["gi"]("Bazooka") and (Old_World and Utils["CheckBoss"]("Wysper")))) then
-							Quest = "Bazooka"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Saber") and (Level["Value"] >= 200 and not Utils["gi"]("Saber")) then
-							Quest = "Saber"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Shark Saw") and (Level["Value"] >= 100 and (not Utils["gi"]("Shark Saw") and (Old_World and Utils["CheckBoss"]("The Saw")))) then
-							Quest = "Shark Saw"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Wardens Sword") and (Level["Value"] >= 100 and (not Utils["gi"]("Wardens Sword") and (Old_World and Utils["CheckBoss"]("Chief Warden")))) then
-							Quest = "Wardens Sword"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Pole (1st Form)") and (Level["Value"] >= 100 and (not Utils["gi"]("Pole (1st Form)") and (Old_World and Utils["CheckBoss"]("Thunder God")))) then
-							Quest = "Pole (1st Form)"
-							return
-						end
-						if ((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("Alchemist", "1") ~= -2 and (Beli["Value"] >= 2500000 and (Level["Value"] >= 850 and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BartiloQuestProgress", "Bartilo") == 3 and not Utils["ffc"](Player["Data"]["Race"], "Evolved")))) then
-							Quest = "Evo Race V1"
-							return
-						end
-						if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "3") ~= -2 and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1") == 0 and (Utils["IsHeavenly"]() and (Level["Value"] >= 1400 and Beli["Value"] >= 2000000))) then
-							Quest = "Evo Race V2"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Gravity Blade") and (not Utils["gi"]("Gravity Blade") and (New_World and (Utils["CheckBoss"]("Orbitus") and Level["Value"] >= 800))) then
-							Quest = "Gravity Blade"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Longsword") and (not Utils["gi"]("Longsword") and (New_World and (Utils["CheckBoss"]("Diamond") and Level["Value"] >= 800))) then
-							Quest = "Longsword"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Rengoku") and (not Utils["gi"]("Rengoku") and (New_World and (Utils["CheckBoss"]("Awakened Ice Admiral") and Level["Value"] >= 800))) then
-							Quest = "Rengoku"
-							return
-						end
-						if Utils["IsHall"]() and (New_World and (Utils["CheckBoss"]("Awakened Ice Admiral") and Level["Value"] >= 800)) then
-							Quest = "Rengoku"
-							return
-						end
-						if not Utils["gi"]("Rengoku") and (Utils["CheckBackpack"]("Hidden Key") and New_World) then
-							repeat
-								Utils["wt"](.3)
-								SetStatusFarm("Using Hidden Key")
-								Utils["Equip"]("Hidden Key")
-								TeleportTo(CFrame["new"](6572.29248, 295.712677, -6966.09961, .803500533, -3.27515153e-08, .595304072, 3.97485422e-08, 1, 1.36659384e-09, -0.595304072, 2.25644108e-08, .803500533), 1.5)
-							until (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](6572.29248, 295.712677, -6966.09961))["Magnitude"] <= 5 or not(getgenv())["AutoFarm"]
-							Utils["wt"](1)
-							return
-						end
-						if New_World and (Utils["IsHall"]() and Utils["CheckBackpack"]("Library Key")) then
-							repeat
-								Utils["wt"](.1)
-								SetStatusFarm("Using Library Key")
-								Utils["Equip"]("Library Key")
-								TeleportTo(CFrame["new"](6377.12549, 296.634735, -6843.76025, -0.860993743, 1.17677516e-07, -0.508615494, 1.31121894e-07, 1, 9.40274347e-09, .508615494, -5.8594928e-08, -0.860993743), 1.5)
-							until (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](6377.12549, 296.634735, -6843.76025))["Magnitude"] <= 1 or not Utils["IsHall"]() or not(getgenv())["AutoFarm"]
-							Utils["wt"](1)
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Flail") and (not Utils["gi"]("Flail") and (New_World and Utils["CheckBoss"]("Smoke Admiral"))) then
-							Quest = "Flail"
-							return
-						end
-						if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BartiloQuestProgress", "Bartilo") ~= 3 and Level["Value"] >= 850 then
-							Quest = "BartiloQuest"
-							return
-						end
-						if not CheckFindWaterKey then
-							if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuySharkmanKarate", true) == TableConcat({
-								"I lost my house keys";
-								", could you help me ",
-								"find them? Thanks."
-							}) and Level["Value"] >= 850 then
-								Quest = "Find Water Key"
-								return
-							end
-						end
-						if New_World and (not Utils["IsHeavenly"]() and ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1") == 0) then
-							Quest = "Don Swan"
-							return
-						end
-						if Three_World and (Utils["tf"](Configs["Sword"], "Yama") and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("EliteHunter", "Progress") >= 30 and not Utils["gi"]("Yama"))) then
-							Quest = "Yama"
-							return
-						end
-						if Three_World and (Utils["tf"](Configs["Sword"], "Tushita") and (not Utils["gi"]("Tushita") and Unlock_Tushita_Quest)) then
-							Quest = "Longma"
-							return
-						end
-						if Utils["tf"](Configs["Gun"], "Soul Guitar") and (not Utils["gi"]("Soul Guitar") and (Level["Value"] >= 2000 and Utils["CheckItem"]("Dark Fragment") >= 1)) then
-							Quest = "Soul Guitar"
-							return
-						end
-						if Level["Value"] >= 2000 and ((getgenv())["Configs"]["Quest"]["RGB Haki"] and not RGB_Haki_H) then
-							if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("HornedMan", "Bet") == nil then
-								Quest = "RGB"
-								return
-							end
-						end
-						if Utils["tf"](Configs["Gun"], "Venom Bow") and (not Utils["gi"]("Venom Bow") and (Three_World and Utils["CheckBoss"]("Hydra Leader"))) then
-							Quest = "Venom Bow"
-							return
-						end
-						if Utils["tf"](Configs["Sword"], "Twin Hooks") and (not Utils["gi"]("Twin Hooks") and (Three_World and Utils["CheckBoss"]("Captain Elephant"))) then
-							Quest = "Twin Hooks"
-							return
-						end
-						if (game:GetService("Workspace"))["Map"]:FindFirstChild("MysticIsland") and (not ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CheckTempleDoor") and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "3") == -2 and Mirror_Fractal_H)) then
-							Quest = "Pull Lerver"
-							return
-						end
-						if FuncC() then
-							Quest = "Cursed Dual Katana"
-							return
-						end
-						if not Dragon_Talon_C then
-							if Utils["ffc"](Player["Backpack"], "Fire Essence") or Utils["ffc"](Player["Character"], "Fire Essence") then
-								repeat
-									SetStatusFarm("Using Fire Essence")
-									Utils["Equip"]("Fire Essence")
-									Utils["wt"](.5)
-    						        if World3 then
-                                        Player.Character.Humanoid.PlatformStand = true
-                                        topos(CFrame.new(5663, 1211, 861))
-                                        Player.Character.Humanoid.PlatformStand = false
-                                        Player.Character.HumanoidRootPart.Anchored = true
-                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon", true)
-                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                                        task.wait(0.5)
-                                        SendWebhook("Purchased Dragon Talon")
-                                        Player.Character.HumanoidRootPart.Anchored = false
-                                    end
-								until not Utils["ffc"](Player["Backpack"], "Fire Essence") and not Utils["ffc"](Player["Character"], "Fire Essence")
-							        if World3 then
-                                        Player.Character.Humanoid.PlatformStand = true
-                                        topos(CFrame.new(5663, 1211, 861))
-                                        Player.Character.Humanoid.PlatformStand = false
-                                        Player.Character.HumanoidRootPart.Anchored = true
-                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                                        task.wait(0.5)
-                                        SendWebhook("Purchased Dragon Talon")
-                                        Player.Character.HumanoidRootPart.Anchored = false
-                                    end
-								    Dragon_Talon_C = true
-								return
-							end
-						end
-						if Fishman_Karate_C_M and (not Dragon_Claw_C and Level["Value"] >= 1100) then
-							if not Dragon_Claw_C then
-								repeat
-									Utils["wt"]()
-									Attack()
-									if Utils["ffc"](Player["Backpack"], "Dragon Claw") or Utils["ffc"](Player["Character"], "Dragon Claw") then
-										Dragon_Claw_C = true
-										return
-									end
-									if not Dragon_Claw_C and Level["Value"] >= 1100 then
-										if Fragments["Value"] >= 1500 then
-											local L_317_ = {}
-                    				        if World2 then
-                                                topos(CFrame.new(701.625, 187.27423095703125, 655.7734985351562))
-                                                Player.Character.Humanoid.PlatformStand = false
-                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                                                task.wait(0.5)
-                                                Player.Character.HumanoidRootPart.Anchored = false
-                                            elseif World3 then
-                                                topos(CFrame.new(-4982.60693359375, 371.627197265625, -3209.21337890625))
-                                                Player.Character.Humanoid.PlatformStand = false
-                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                                                task.wait(0.5)
-                                                Player.Character.HumanoidRootPart.Anchored = false
-                                            end
-											Dragon_Claw_C = true
-											return
-										elseif Fragments["Value"] < 1500 then
-											if Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] and (Fragments["Value"] < 1500 and not Dragon_Claw_C) then
-												SetStatusFarm("Auto Farm Raid")
-												if #Utils["GetMobRaid"]() == 0 then
-													if Select_Map == "Magma" or Select_Map == "Flame" then
-														for L_318_forvar0, L_319_forvar1 in pairs(Workspace:GetDescendants()) do
-															local L_320_ = {}
-															L_320_[3], L_320_[2] = L_318_forvar0, L_319_forvar1
-															if L_320_[2]["Name"] == "Lava" then
-																L_320_[2]:Destroy()
-															end
-														end
-													end
-													if Utils["GetRaid"]("Island 5", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 5", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 4", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 4", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 3", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 3", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 2", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 2", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 1", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 1", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													end
-												else
-													for L_321_forvar0, L_322_forvar1 in pairs(Enemies:GetChildren()) do
-														local L_323_ = {}
-														L_323_[2], L_323_[1] = L_321_forvar0, L_322_forvar1
-														if L_323_[1]:FindFirstChild("HumanoidRootPart") and (L_323_[1]:FindFirstChild("Humanoid") and ((L_323_[1]:FindFirstChild("Humanoid"))["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["CFrame"]["Position"] - L_323_[1]["HumanoidRootPart"]["CFrame"]["Position"])["Magnitude"] <= 5000)) then
-															repeat
-																local L_324_ = {}
-																Utils["wt"](.1)
-																if Select_Map == "Magma" or Select_Map == "Flame" then
-																	for L_325_forvar0, L_326_forvar1 in pairs(Workspace:GetDescendants()) do
-																		local L_327_ = {}
-																		L_327_[1], L_327_[2] = L_325_forvar0, L_326_forvar1
-																		if L_327_[2]["Name"] == "Lava" then
-																			L_327_[2]:Destroy()
-																		end
-																	end
-																end
-																L_324_[2] = math["random"](1, 5)
-																if L_324_[2] == 1 then
-																	L_324_[3] = CFrame["new"](0, 30, 1)
-																elseif L_324_[2] == 2 then
-																	L_324_[3] = CFrame["new"](0, 30, 15)
-																elseif L_324_[2] == 3 then
-																	L_324_[3] = CFrame["new"](1, 30, -15)
-																elseif L_324_[2] == 4 then
-																	L_324_[3] = CFrame["new"](15, 30, 0)
-																elseif L_324_[2] == 5 then
-																	L_324_[3] = CFrame["new"](-15, 30, 0)
-																end
-																TeleportTo(L_323_[1]["HumanoidRootPart"]["CFrame"] * L_324_[3], 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															until not L_323_[1]["Parent"] or L_323_[1]["Humanoid"]["Health"] <= 0 or #Utils["GetMobRaid"]() == 0
-														end
-													end
-												end
-											else
-												if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-													Select_Map = "Dark"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-													Select_Map = "Sand"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-													Select_Map = "Magma"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-													Select_Map = "Rumble"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-													Select_Map = "Flame"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-													Select_Map = "Ice"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-													Select_Map = "Light"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-													Select_Map = "String"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-													Select_Map = "Quake"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-													Select_Map = "Buddha"
-												else
-													Select_Map = "Ice"
-												end
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-												Utils["wt"](.2)
-												if Player["Backpack"]:FindFirstChild("Special Microchip") or Player["Character"]:FindFirstChild("Special Microchip") and Player["Character"]["Humanoid"]["Health"] > 0 then
-													if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-														local L_328_ = {}
-														fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-														L_328_[2] = 0
-														repeat
-															L_328_[2] = L_328_[2] + 1
-															Utils["wt"](1)
-														until L_328_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"] == true
-													elseif PlaceId == 7449423635 then
-														TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-														if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-															if Player["Character"]["Humanoid"]["Health"] > 0 then
-																local L_329_ = {}
-																fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																L_329_[1] = 0
-																repeat
-																	L_329_[1] = L_329_[1] + 1
-																	Utils["wt"](1)
-																until L_329_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"] == true
-															end
-														end
-													end
-												else
-													if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-														if Beli["Value"] >= 0 and Player["Data"]["Fragments"]["Value"] >= 1500 then
-															local L_330_ = {}
-                									        if World2 then
-                                                                topos(CFrame.new(701.625, 187.27423095703125, 655.7734985351562))
-                                                                Player.Character.Humanoid.PlatformStand = false
-                                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                                                                task.wait(0.5)
-                                                                Player.Character.HumanoidRootPart.Anchored = false
-                                                            elseif World3 then
-                                                                topos(CFrame.new(-4982.60693359375, 371.627197265625, -3209.21337890625))
-                                                                Player.Character.Humanoid.PlatformStand = false
-                                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","1")
-                                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BlackbeardReward","DragonClaw","2")
-                                                                task.wait(0.5)
-                                                                Player.Character.HumanoidRootPart.Anchored = false
-                                                            end
-															Dragon_Claw_C = true
-															return
-														end
-														table["sort"](Utils["GetFruits"](), function(L_331_arg0, L_332_arg1)
-															local L_333_ = {}
-															L_333_[2], L_333_[1] = L_331_arg0, L_332_arg1
-															if L_333_[2]["Value"] < 100000 and L_333_[2]["Value"] < 100000 then
-																return L_333_[2]["Value"] < L_333_[1]["Value"]
-															end
-														end)
-														Utils["wt"](1)
-														if #Utils["GetFruits"]() > 0 and not Dragon_Claw_C then
-															Utils["wt"](2)
-															if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-																if Player["Character"]["Humanoid"]["Health"] > 0 and Player["Data"]["Fragments"]["Value"] < 5000 then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadFruit", (Utils["GetFruits"]())[1]["Name"])
-																elseif Fragments["Value"] < 5000 then
-																	break
-																end
-																if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-																	Select_Map = "Dark"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-																	Select_Map = "Sand"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-																	Select_Map = "Magma"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-																	Select_Map = "Rumble"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-																	Select_Map = "Flame"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-																	Select_Map = "Ice"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-																	Select_Map = "Light"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-																	Select_Map = "String"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-																	Select_Map = "Quake"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-																	Select_Map = "Buddha"
-																else
-																	Select_Map = "Ice"
-																end
-																ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-																if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-																	local L_334_ = {}
-																	fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																	L_334_[2] = 0
-																	repeat
-																		L_334_[2] = L_334_[2] + 1
-																		Utils["wt"](1)
-																	until L_334_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																elseif PlaceId == 7449423635 then
-																	TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-																	if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-																		if Player["Character"]["Humanoid"]["Health"] > 0 then
-																			local L_335_ = {}
-																			fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																			L_335_[1] = 0
-																			repeat
-																				L_335_[1] = L_335_[1] + 1
-																				Utils["wt"](1)
-																			until L_335_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																		end
-																	end
-																end
-															end
-														else
-															Quest = nil
-															SetStatusFarm("Farming Level")
-															FuncA()
-														end
-													end
-												end
-											end
-										end
-									end
-								until Dragon_Claw_C
-							end
-							return
-						end
-						L_316_[1] = function()
-							for L_336_forvar0, L_337_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-								local L_338_ = {}
-								L_338_[3], L_338_[1] = L_336_forvar0, L_337_forvar1
-								if L_338_[1]["Value"] and L_338_[1]["Value"] >= 1000000 then
-									return true
-								end
-							end
-							return false
-						end
-						if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1") ~= 0 and (game["Players"]["LocalPlayer"]["Data"]["Level"]["Value"] >= 900 and L_316_[1]()) then
-							repeat
-								Utils["wt"]()
-								noFruit = true
-								for L_339_forvar0, L_340_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")) do
-									local L_341_ = {}
-									L_341_[2], L_341_[1] = L_339_forvar0, L_340_forvar1
-									if L_341_[1]["Value"] and L_341_[1]["Value"] >= 1000000 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("LoadFruit", L_341_[1]["Name"])
-										Utils["wt"](1)
-										for L_342_forvar0, L_343_forvar1 in pairs((game:GetService("Players"))["LocalPlayer"]["Backpack"]:GetChildren()) do
-											local L_344_ = {}
-											L_344_[3], L_344_[1] = L_342_forvar0, L_343_forvar1
-											if string["find"](L_344_[1]["Name"], "Fruit") then
-												Utils["Equip"](L_344_[1])
-											end
-										end
-										Utils["wt"](.2)
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1")
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "2")
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "3")
-										return
-									end
-								end
-							until ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1") == 0 or not L_316_[1]()
-							noFruit = false
-						end
-						if Level["Value"] >= 1500 and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1") ~= 0 and not L_316_[1]()) then
-							Utils["HopLowServer"](10)
-							return
-						end
-						if Super_human and (not Death_Step and Level["Value"] >= 1100) then
-							if not Death_Step then
-								repeat
-									Utils["wt"]()
-									Attack()
-									if not Super_humanw_C_M then
-								        if World2 then
-                                            topos(CFrame.new(1375.435546875, 247.74224853515625, -5189.08642578125))
-                                            Player.Character.Humanoid.PlatformStand = false
-                                            Player.Character.HumanoidRootPart.Anchored = true
-                                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySuperhuman")
-                                            task.wait(0.5)
-                                            SendWebhook("Purchased Superhuman!")
-                                            Player.Character.HumanoidRootPart.Anchored = false
-                                        elseif World3 then
-                                            topos(CFrame.new(-5002.439453125, 371.627197265625, -3197.56640625))
-                                            Player.Character.Humanoid.PlatformStand = false
-                                            Player.Character.HumanoidRootPart.Anchored = true
-                                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySuperhuman")
-                                            task.wait(0.5)
-                                            SendWebhook("Purchased Superhuman!")
-                                            Player.Character.HumanoidRootPart.Anchored = false
-                                        end
-										if Player["Character"]["Superhuman"]["Level"]["Value"] < 400 then
-											repeat
-												Utils["wt"]()
-												Attack()
-												Quest = nil
-												SetStatusFarm("Farming Level")
-												FuncA()
-											until Player["Character"]["Superhuman"]["Level"]["Value"] >= 400
-											Super_humanw_C_M = true
-										end
-									end
-									if Utils["ffc"](Player["Backpack"], "Death Step") or Utils["ffc"](Player["Character"], "Death Step") then
-										Death_Step = true
-										return
-									end
-									if not Death_Step and Level["Value"] >= 1100 then
-										if Fragments["Value"] >= 5000 then
-											if Black_Leg_C_M then
-												if Beli["Value"] >= 2500000 then
-        									        if World2 then
-                                                        topos(CFrame.new(6356.86474609375, 296.94586181640625, -6761.203125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDeathStep")
-                                                        task.wait(0.5)
-                                                        SendWebhook("Purchased Death Step!")
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    elseif World3 then
-                                                        topos(CFrame.new(-4999.23193359375, 313.9510192871094, -3221.530517578125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDeathStep")
-                                                        task.wait(0.5)
-                                                        SendWebhook("Purchased Death Step!")
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    end
-													Death_Step = true
-													return
-												else
-													Attack()
-													Quest = nil
-													SetStatusFarm("Farming Level")
-													FuncA()
-												end
-											else
-												repeat
-													Utils["wt"]()
-                                                    if Old_World then
-                                                        TeleportTo(CFrame.new(-984.7499389648438, 14.066271781921387, 3987.7001953125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                                                        task.wait(0.5)
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    elseif New_World then
-                                                        TeleportTo(CFrame.new(-4996.2734375, 42.98426055908203, -4500.1748046875))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                                                        task.wait(0.5)
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    elseif Three_World then
-                                                        TeleportTo(CFrame.new(-5043.21142578125, 371.627197265625, -3182.06689453125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBlackLeg")
-                                                        task.wait(0.5)
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    end
-													Attack()
-													Quest = nil
-													SetStatusFarm("Farming Level")
-													FuncA()
-												until Player["Character"]["Black Leg"]["Level"]["Value"] >= 400
-												Black_Leg_C_M = true
-												if not Super_human then
-												    if World2 then
-                                                        topos(CFrame.new(1375.435546875, 247.74224853515625, -5189.08642578125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySuperhuman")
-                                                        task.wait(0.5)
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    elseif World3 then
-                                                        topos(CFrame.new(-5002.439453125, 371.627197265625, -3197.56640625))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySuperhuman")
-                                                        task.wait(0.5)
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    end
-												end
-												return
-											end
-										elseif Fragments["Value"] < 5000 then
-											if Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] and (Fragments["Value"] < 5000 and not Death_Step) then
-												SetStatusFarm("Auto Farm Raid")
-												if #Utils["GetMobRaid"]() == 0 then
-													if Select_Map == "Magma" or Select_Map == "Flame" then
-														for L_345_forvar0, L_346_forvar1 in pairs(Workspace:GetDescendants()) do
-															local L_347_ = {}
-															L_347_[2], L_347_[1] = L_345_forvar0, L_346_forvar1
-															if L_347_[1]["Name"] == "Lava" then
-																L_347_[1]:Destroy()
-															end
-														end
-													end
-													if Utils["GetRaid"]("Island 5", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 5", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 4", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 4", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 3", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 3", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 2", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 2", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 1", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 1", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													end
-												else
-													for L_348_forvar0, L_349_forvar1 in pairs(Enemies:GetChildren()) do
-														local L_350_ = {}
-														L_350_[2], L_350_[1] = L_348_forvar0, L_349_forvar1
-														if L_350_[1]:FindFirstChild("HumanoidRootPart") and (L_350_[1]:FindFirstChild("Humanoid") and ((L_350_[1]:FindFirstChild("Humanoid"))["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["CFrame"]["Position"] - L_350_[1]["HumanoidRootPart"]["CFrame"]["Position"])["Magnitude"] <= 5000)) then
-															repeat
-																local L_351_ = {}
-																Utils["wt"](.1)
-																if Select_Map == "Magma" or Select_Map == "Flame" then
-																	for L_352_forvar0, L_353_forvar1 in pairs(Workspace:GetDescendants()) do
-																		local L_354_ = {}
-																		L_354_[1], L_354_[3] = L_352_forvar0, L_353_forvar1
-																		if L_354_[3]["Name"] == "Lava" then
-																			L_354_[3]:Destroy()
-																		end
-																	end
-																end
-																L_351_[2] = math["random"](1, 5)
-																if L_351_[2] == 1 then
-																	L_351_[1] = CFrame["new"](0, 30, 1)
-																elseif L_351_[2] == 2 then
-																	L_351_[1] = CFrame["new"](0, 30, 15)
-																elseif L_351_[2] == 3 then
-																	L_351_[1] = CFrame["new"](1, 30, -15)
-																elseif L_351_[2] == 4 then
-																	L_351_[1] = CFrame["new"](15, 30, 0)
-																elseif L_351_[2] == 5 then
-																	L_351_[1] = CFrame["new"](-15, 30, 0)
-																end
-																TeleportTo(L_350_[1]["HumanoidRootPart"]["CFrame"] * L_351_[1], 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															until not L_350_[1]["Parent"] or L_350_[1]["Humanoid"]["Health"] <= 0 or #Utils["GetMobRaid"]() == 0
-														end
-													end
-												end
-											else
-												if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-													Select_Map = "Dark"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-													Select_Map = "Sand"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-													Select_Map = "Magma"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-													Select_Map = "Rumble"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-													Select_Map = "Flame"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-													Select_Map = "Ice"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-													Select_Map = "Light"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-													Select_Map = "String"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-													Select_Map = "Quake"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-													Select_Map = "Buddha"
-												else
-													Select_Map = "Ice"
-												end
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-												Utils["wt"](.2)
-												if Player["Backpack"]:FindFirstChild("Special Microchip") or Player["Character"]:FindFirstChild("Special Microchip") and Player["Character"]["Humanoid"]["Health"] > 0 then
-													if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-														local L_355_ = {}
-														fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-														L_355_[1] = 0
-														repeat
-															L_355_[1] = L_355_[1] + 1
-															Utils["wt"](1)
-														until L_355_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"] == true
-													elseif PlaceId == 7449423635 then
-														TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-														if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-															if Player["Character"]["Humanoid"]["Health"] > 0 then
-																local L_356_ = {}
-																fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																L_356_[1] = 0
-																repeat
-																	L_356_[1] = L_356_[1] + 1
-																	Utils["wt"](1)
-																until L_356_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-															end
-														end
-													end
-												else
-													if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-														if Player["Data"]["Fragments"]["Value"] >= 5000 then
-															if Player["Data"]["Beli"]["Value"] >= 2500000 then
-    												        if World2 then
-                                                                topos(CFrame.new(6356.86474609375, 296.94586181640625, -6761.203125))
-                                                                Player.Character.Humanoid.PlatformStand = false
-                                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDeathStep")
-                                                                task.wait(0.5)
-                                                                Player.Character.HumanoidRootPart.Anchored = false
-                                                            elseif World3 then
-                                                                topos(CFrame.new(-4999.23193359375, 313.9510192871094, -3221.530517578125))
-                                                                Player.Character.Humanoid.PlatformStand = false
-                                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDeathStep")
-                                                                task.wait(0.5)
-                                                                Player.Character.HumanoidRootPart.Anchored = false
-                                                            end
-																Death_Step = true
-																return
-															end
-															return
-														end
-														table["sort"](Utils["GetFruits"](), function(L_357_arg0, L_358_arg1)
-															local L_359_ = {}
-															L_359_[3], L_359_[1] = L_357_arg0, L_358_arg1
-															if L_359_[3]["Value"] < 100000 and L_359_[3]["Value"] < 100000 then
-																return L_359_[3]["Value"] < L_359_[1]["Value"]
-															end
-														end)
-														Utils["wt"](1)
-														if #Utils["GetFruits"]() > 0 and not Death_Step then
-															warn()
-															Utils["wt"](2)
-															if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-																if Player["Character"]["Humanoid"]["Health"] > 0 and Player["Data"]["Fragments"]["Value"] < 5000 then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadFruit", (Utils["GetFruits"]())[1]["Name"])
-																elseif Fragments["Value"] < 5000 then
-																	break
-																end
-																if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-																	Select_Map = "Dark"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-																	Select_Map = "Sand"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-																	Select_Map = "Magma"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-																	Select_Map = "Rumble"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-																	Select_Map = "Flame"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-																	Select_Map = "Ice"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-																	Select_Map = "Light"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-																	Select_Map = "String"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-																	Select_Map = "Quake"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-																	Select_Map = "Buddha"
-																else
-																	Select_Map = "Ice"
-																end
-																ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-																if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-																	local L_360_ = {}
-																	fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																	L_360_[2] = 0
-																	repeat
-																		L_360_[2] = L_360_[2] + 1
-																		Utils["wt"](1)
-																	until L_360_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																elseif PlaceId == 7449423635 then
-																	TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-																	if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-																		if Player["Character"]["Humanoid"]["Health"] > 0 then
-																			local L_361_ = {}
-																			fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																			L_361_[1] = 0
-																			repeat
-																				L_361_[1] = L_361_[1] + 1
-																				Utils["wt"](1)
-																			until L_361_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																		end
-																	end
-																end
-															end
-														else
-															Quest = nil
-															SetStatusFarm("Farming Level")
-															FuncA()
-														end
-													end
-												end
-											end
-										end
-									end
-								until Death_Step
-							end
-							return
-						end
-						if Dragon_Claw_C_M and (not Sharkman_Karate_C and Level["Value"] >= 1100) then
-							if not Sharkman_Karate_C then
-								repeat
-									Utils["wt"]()
-									Attack()
-									if Utils["ffc"](Player["Backpack"], "Sharkman Karate") or Utils["ffc"](Player["Character"], "Sharkman Karate") then
-										Sharkman_Karate_C = true
-										return
-									end
-									if not Sharkman_Karate_C and Level["Value"] >= 1100 then
-										if Fragments["Value"] >= 5000 then
-											if Beli["Value"] >= 2550000 and not Sharkman_Karate_C then
-        							        if World2 then
-                                                topos(CFrame.new(-2601.416259765625, 239.27285766601562, -10312.27734375))
-                                                Player.Character.Humanoid.PlatformStand = false
-                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                                                task.wait(0.5)
-                                                SendWebhook("Purchased Sharkman Karate!")
-                                                Player.Character.HumanoidRootPart.Anchored = false
-                                            elseif World3 then
-                                                topos(CFrame.new(-4971.24365234375, 314.0325622558594, -3223.034912109375))
-                                                Player.Character.Humanoid.PlatformStand = false
-                                                Player.Character.HumanoidRootPart.Anchored = true
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                                                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                                                task.wait(0.5)
-                                                SendWebhook("Purchased Sharkman Karate!")
-                                                Player.Character.HumanoidRootPart.Anchored = false
-                                            end
-												Sharkman_Karate_C = true
-												return
-											else
-												Attack()
-												Quest = nil
-												SetStatusFarm("Farming Level")
-												FuncA()
-											end
-										elseif Fragments["Value"] < 5000 then
-											if Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] and (Fragments["Value"] < 5000 and not Sharkman_Karate_C) then
-												SetStatusFarm("Auto Farm Raid")
-												if #Utils["GetMobRaid"]() == 0 then
-													if Select_Map == "Magma" or Select_Map == "Flame" then
-														for L_362_forvar0, L_363_forvar1 in pairs(Workspace:GetDescendants()) do
-															local L_364_ = {}
-															L_364_[1], L_364_[3] = L_362_forvar0, L_363_forvar1
-															if L_364_[3]["Name"] == "Lava" then
-																L_364_[3]:Destroy()
-															end
-														end
-													end
-													if Utils["GetRaid"]("Island 5", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 5", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 4", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 4", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 3", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 3", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 2", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 2", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 1", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 1", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													end
-												else
-													for L_365_forvar0, L_366_forvar1 in pairs(Enemies:GetChildren()) do
-														local L_367_ = {}
-														L_367_[3], L_367_[1] = L_365_forvar0, L_366_forvar1
-														if L_367_[1]:FindFirstChild("HumanoidRootPart") and (L_367_[1]:FindFirstChild("Humanoid") and ((L_367_[1]:FindFirstChild("Humanoid"))["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["CFrame"]["Position"] - L_367_[1]["HumanoidRootPart"]["CFrame"]["Position"])["Magnitude"] <= 5000)) then
-															repeat
-																local L_368_ = {}
-																Utils["wt"](.1)
-																if Select_Map == "Magma" or Select_Map == "Flame" then
-																	for L_369_forvar0, L_370_forvar1 in pairs(Workspace:GetDescendants()) do
-																		local L_371_ = {}
-																		L_371_[2], L_371_[3] = L_369_forvar0, L_370_forvar1
-																		if L_371_[3]["Name"] == "Lava" then
-																			L_371_[3]:Destroy()
-																		end
-																	end
-																end
-																L_368_[2] = math["random"](1, 5)
-																if L_368_[2] == 1 then
-																	L_368_[3] = CFrame["new"](0, 30, 1)
-																elseif L_368_[2] == 2 then
-																	L_368_[3] = CFrame["new"](0, 30, 15)
-																elseif L_368_[2] == 3 then
-																	L_368_[3] = CFrame["new"](1, 30, -15)
-																elseif L_368_[2] == 4 then
-																	L_368_[3] = CFrame["new"](15, 30, 0)
-																elseif L_368_[2] == 5 then
-																	L_368_[3] = CFrame["new"](-15, 30, 0)
-																end
-																TeleportTo(L_367_[1]["HumanoidRootPart"]["CFrame"] * L_368_[3], 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															until not L_367_[1]["Parent"] or L_367_[1]["Humanoid"]["Health"] <= 0 or #Utils["GetMobRaid"]() == 0
-														end
-													end
-												end
-											else
-												if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-													Select_Map = "Dark"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-													Select_Map = "Sand"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-													Select_Map = "Magma"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-													Select_Map = "Rumble"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-													Select_Map = "Flame"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-													Select_Map = "Ice"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-													Select_Map = "Light"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-													Select_Map = "String"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-													Select_Map = "Quake"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-													Select_Map = "Buddha"
-												else
-													Select_Map = "Ice"
-												end
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-												Utils["wt"](.2)
-												if Player["Backpack"]:FindFirstChild("Special Microchip") or Player["Character"]:FindFirstChild("Special Microchip") and Player["Character"]["Humanoid"]["Health"] > 0 then
-													if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-														local L_372_ = {}
-														fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-														L_372_[1] = 0
-														repeat
-															L_372_[1] = L_372_[1] + 1
-															Utils["wt"](1)
-														until L_372_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-													elseif PlaceId == 7449423635 then
-														TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-														if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-															if Player["Character"]["Humanoid"]["Health"] > 0 then
-																local L_373_ = {}
-																fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																L_373_[2] = 0
-																repeat
-																	L_373_[2] = L_373_[2] + 1
-																	Utils["wt"](1)
-																until L_373_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-															end
-														end
-													end
-												else
-													if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-														if Beli["Value"] >= 0 and Player["Data"]["Fragments"]["Value"] >= 5000 then
-            									        if World2 then
-                                                            topos(CFrame.new(-2601.416259765625, 239.27285766601562, -10312.27734375))
-                                                            Player.Character.Humanoid.PlatformStand = false
-                                                            Player.Character.HumanoidRootPart.Anchored = true
-                                                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                                                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                                                            task.wait(0.5)
-                                                            Player.Character.HumanoidRootPart.Anchored = false
-                                                        elseif World3 then
-                                                            topos(CFrame.new(-4971.24365234375, 314.0325622558594, -3223.034912109375))
-                                                            Player.Character.Humanoid.PlatformStand = false
-                                                            Player.Character.HumanoidRootPart.Anchored = true
-                                                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                                                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                                                            task.wait(0.5)
-                                                            Player.Character.HumanoidRootPart.Anchored = false
-                                                        end
-															Sharkman_Karate_C = true
-															return
-														end
-														table["sort"](Utils["GetFruits"](), function(L_374_arg0, L_375_arg1)
-															local L_376_ = {}
-															L_376_[3], L_376_[1] = L_374_arg0, L_375_arg1
-															if L_376_[3]["Value"] < 100000 and L_376_[3]["Value"] < 100000 then
-																return L_376_[3]["Value"] < L_376_[1]["Value"]
-															end
-														end)
-														Utils["wt"](1)
-														if #Utils["GetFruits"]() > 0 and not Sharkman_Karate_C then
-															Utils["wt"](2)
-															if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-																if Player["Character"]["Humanoid"]["Health"] > 0 and Player["Data"]["Fragments"]["Value"] < 5000 then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadFruit", (Utils["GetFruits"]())[1]["Name"])
-																elseif Fragments["Value"] < 5000 then
-																	break
-																end
-																if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-																	Select_Map = "Dark"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-																	Select_Map = "Sand"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-																	Select_Map = "Magma"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-																	Select_Map = "Rumble"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-																	Select_Map = "Flame"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-																	Select_Map = "Ice"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-																	Select_Map = "Light"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-																	Select_Map = "String"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-																	Select_Map = "Quake"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-																	Select_Map = "Buddha"
-																else
-																	Select_Map = "Ice"
-																end
-																ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-																if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-																	local L_377_ = {}
-																	fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																	L_377_[1] = 0
-																	repeat
-																		L_377_[1] = L_377_[1] + 1
-																		Utils["wt"](1)
-																	until L_377_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																elseif PlaceId == 7449423635 then
-																	TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-																	if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-																		if Player["Character"]["Humanoid"]["Health"] > 0 then
-																			local L_378_ = {}
-																			fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																			L_378_[2] = 0
-																			repeat
-																				L_378_[2] = L_378_[2] + 1
-																				Utils["wt"](1)
-																			until L_378_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																		end
-																	end
-																end
-															end
-														else
-															Quest = nil
-															SetStatusFarm("Auto Farm Level")
-															FuncA()
-														end
-													end
-												end
-											end
-										end
-									end
-								until Sharkman_Karate_C
-							end
-							return
-						end
-						if Sharkman_Karate_C_M and (not Electric_Claw_C and Level["Value"] >= 1100) then
-							if not Electric_Claw_C then
-								repeat
-									Utils["wt"]()
-									Attack()
-									if Utils["ffc"](Player["Backpack"], "Electric Claw") or Utils["ffc"](Player["Character"], "Electric Claw") then
-										Electric_Claw_C = true
-										return
-									end
-									if not Electric_Claw_C and Level["Value"] >= 1100 then
-										if Fragments["Value"] >= 5000 then
-											if Beli["Value"] >= 3000000 then
-												pcall(function()
-            								        if World3 then
-                                                        Player.Character.Humanoid.PlatformStand = true
-                                                        topos(CFrame.new(-12551, 337, -7476))
-                                                        task.wait(1)
-                                                        topos(CFrame.new(-10370.771484375, 331.9684143066406, -10133.3828125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectricClaw")
-                                                        task.wait(0.5)
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    end
-													if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 2 then
-														Electric_Claw_C = true
-													end
-												end)
-												if not Electric_Claw_C then
-            								        if World3 then
-                                                        Player.Character.Humanoid.PlatformStand = true
-                                                        topos(CFrame.new(-12551, 337, -7476))
-                                                        task.wait(1)
-                                                        topos(CFrame.new(-10370.771484375, 331.9684143066406, -10133.3828125))
-                                                        Player.Character.Humanoid.PlatformStand = false
-                                                        Player.Character.HumanoidRootPart.Anchored = true
-                                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectricClaw")
-                                                        task.wait(0.5)
-                                                        SendWebhook("Purchased Electric Claw!")
-                                                        Player.Character.HumanoidRootPart.Anchored = false
-                                                    end
-													if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 2 then
-														Electric_Claw_C = true
-													end
-												end
-												if Three_World and not Electric_Claw_C then
-													Quest = "Quest Electric Claw"
-												end
-												return
-											else
-												Attack()
-												Quest = nil
-												SetStatusFarm("Farming Level")
-												FuncA()
-											end
-										elseif Fragments["Value"] < 5000 then
-											if Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] and (Fragments["Value"] < 5000 and not Electric_Claw_C) then
-												SetStatusFarm("Auto Farm Raid")
-												if #Utils["GetMobRaid"]() == 0 then
-													if Select_Map == "Magma" or Select_Map == "Flame" then
-														for L_379_forvar0, L_380_forvar1 in pairs(Workspace:GetDescendants()) do
-															local L_381_ = {}
-															L_381_[2], L_381_[1] = L_379_forvar0, L_380_forvar1
-															if L_381_[1]["Name"] == "Lava" then
-																L_381_[1]:Destroy()
-															end
-														end
-													end
-													if Utils["GetRaid"]("Island 5", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 5", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 4", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 4", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 3", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 3", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 2", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 2", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 1", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 1", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													end
-												else
-													for L_382_forvar0, L_383_forvar1 in pairs(Enemies:GetChildren()) do
-														local L_384_ = {}
-														L_384_[1], L_384_[2] = L_382_forvar0, L_383_forvar1
-														if L_384_[2]:FindFirstChild("HumanoidRootPart") and (L_384_[2]:FindFirstChild("Humanoid") and ((L_384_[2]:FindFirstChild("Humanoid"))["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["CFrame"]["Position"] - L_384_[2]["HumanoidRootPart"]["CFrame"]["Position"])["Magnitude"] <= 5000)) then
-															repeat
-																local L_385_ = {}
-																Utils["wt"](.1)
-																if Select_Map == "Magma" or Select_Map == "Flame" then
-																	for L_386_forvar0, L_387_forvar1 in pairs(Workspace:GetDescendants()) do
-																		local L_388_ = {}
-																		L_388_[3], L_388_[2] = L_386_forvar0, L_387_forvar1
-																		if L_388_[2]["Name"] == "Lava" then
-																			L_388_[2]:Destroy()
-																		end
-																	end
-																end
-																L_385_[2] = math["random"](1, 5)
-																if L_385_[2] == 1 then
-																	L_385_[1] = CFrame["new"](0, 30, 1)
-																elseif L_385_[2] == 2 then
-																	L_385_[1] = CFrame["new"](0, 30, 15)
-																elseif L_385_[2] == 3 then
-																	L_385_[1] = CFrame["new"](1, 30, -15)
-																elseif L_385_[2] == 4 then
-																	L_385_[1] = CFrame["new"](15, 30, 0)
-																elseif L_385_[2] == 5 then
-																	L_385_[1] = CFrame["new"](-15, 30, 0)
-																end
-																TeleportTo(L_384_[2]["HumanoidRootPart"]["CFrame"] * L_385_[1], 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															until not L_384_[2]["Parent"] or L_384_[2]["Humanoid"]["Health"] <= 0 or #Utils["GetMobRaid"]() == 0
-														end
-													end
-												end
-											else
-												if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-													Select_Map = "Dark"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-													Select_Map = "Sand"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-													Select_Map = "Magma"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-													Select_Map = "Rumble"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-													Select_Map = "Flame"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-													Select_Map = "Ice"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-													Select_Map = "Light"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-													Select_Map = "String"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-													Select_Map = "Quake"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-													Select_Map = "Buddha"
-												else
-													Select_Map = "Ice"
-												end
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-												Utils["wt"](.2)
-												if Player["Backpack"]:FindFirstChild("Special Microchip") or Player["Character"]:FindFirstChild("Special Microchip") and Player["Character"]["Humanoid"]["Health"] > 0 then
-													if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-														local L_389_ = {}
-														fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-														L_389_[2] = 0
-														repeat
-															L_389_[2] = L_389_[2] + 1
-															Utils["wt"](1)
-														until L_389_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-													elseif PlaceId == 7449423635 then
-														TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-														if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-															if Player["Character"]["Humanoid"]["Health"] > 0 then
-																local L_390_ = {}
-																fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																L_390_[2] = 0
-																repeat
-																	L_390_[2] = L_390_[2] + 1
-																	Utils["wt"](1)
-																until L_390_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-															end
-														end
-													end
-												else
-													if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-														if Player["Data"]["Fragments"]["Value"] >= 5000 then
-															if Player["Data"]["Beli"]["Value"] >= 3000000 then
-    													        if World3 then
-                                                                    Player.Character.Humanoid.PlatformStand = true
-                                                                    topos(CFrame.new(-12551, 337, -7476))
-                                                                    task.wait(1)
-                                                                    topos(CFrame.new(-10370.771484375, 331.9684143066406, -10133.3828125))
-                                                                    Player.Character.Humanoid.PlatformStand = false
-                                                                    Player.Character.HumanoidRootPart.Anchored = true
-                                                                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyElectricClaw")
-                                                                    task.wait(0.5)
-                                                                    Player.Character.HumanoidRootPart.Anchored = false
-                                                                end
-																if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw") == 2 then
-																	Electric_Claw_C = true
-																end
-																return
-															end
-															return
-														end
-														table["sort"](Utils["GetFruits"](), function(L_391_arg0, L_392_arg1)
-															local L_393_ = {}
-															L_393_[2], L_393_[3] = L_391_arg0, L_392_arg1
-															if L_393_[2]["Value"] < 100000 and L_393_[2]["Value"] < 100000 then
-																return L_393_[2]["Value"] < L_393_[3]["Value"]
-															end
-														end)
-														Utils["wt"](1)
-														if #Utils["GetFruits"]() > 0 and not Electric_Claw_C then
-															warn()
-															Utils["wt"](2)
-															if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-																if Player["Character"]["Humanoid"]["Health"] > 0 and Player["Data"]["Fragments"]["Value"] < 5000 then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadFruit", (Utils["GetFruits"]())[1]["Name"])
-																elseif Fragments["Value"] < 5000 then
-																	break
-																end
-																if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-																	Select_Map = "Dark"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-																	Select_Map = "Sand"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-																	Select_Map = "Magma"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-																	Select_Map = "Rumble"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-																	Select_Map = "Flame"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-																	Select_Map = "Ice"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-																	Select_Map = "Light"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-																	Select_Map = "String"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-																	Select_Map = "Quake"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-																	Select_Map = "Buddha"
-																else
-																	Select_Map = "Ice"
-																end
-																ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-																if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-																	local L_394_ = {}
-																	fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																	L_394_[2] = 0
-																	repeat
-																		L_394_[2] = L_394_[2] + 1
-																		Utils["wt"](1)
-																	until L_394_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																elseif PlaceId == 7449423635 then
-																	TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-																	if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-																		if Player["Character"]["Humanoid"]["Health"] > 0 then
-																			local L_395_ = {}
-																			fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																			L_395_[2] = 0
-																			repeat
-																				L_395_[2] = L_395_[2] + 1
-																				Utils["wt"](1)
-																			until L_395_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																		end
-																	end
-																end
-															end
-														else
-															Quest = nil
-															SetStatusFarm("Farming Level")
-															FuncA()
-														end
-													end
-												end
-											end
-										end
-									end
-								until Electric_Claw_C
-							end
-							return
-						end
-						if Electric_Claw_C_M and (not Dragon_Talon_C and Level["Value"] >= 1100) then
-							if not Dragon_Talon_C then
-								repeat
-									Utils["wt"]()
-									Attack()
-									if Utils["ffc"](Player["Backpack"], "Dragon Talon") or Utils["ffc"](Player["Character"], "Dragon Talon") then
-										Dragon_Talon_C = true
-										return
-									end
-									if not Dragon_Talon_C and Level["Value"] >= 1100 then
-										if Fragments["Value"] >= 5000 then
-											if Beli["Value"] >= 3000000 then
-												Quest = nil
-												SetStatusFarm("Farming Bones")
-												Utils["FarmBone"](true)
-											else
-												Attack()
-												Quest = nil
-												SetStatusFarm("Farming Level")
-												FuncA()
-											end
-										elseif Fragments["Value"] < 5000 then
-											if Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] and (Fragments["Value"] < 5000 and not Dragon_Talon_C) then
-												SetStatusFarm("Auto Farm Raid")
-												if #Utils["GetMobRaid"]() == 0 then
-													if Select_Map == "Magma" or Select_Map == "Flame" then
-														for L_396_forvar0, L_397_forvar1 in pairs(Workspace:GetDescendants()) do
-															local L_398_ = {}
-															L_398_[1], L_398_[3] = L_396_forvar0, L_397_forvar1
-															if L_398_[3]["Name"] == "Lava" then
-																L_398_[3]:Destroy()
-															end
-														end
-													end
-													if Utils["GetRaid"]("Island 5", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 5", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 4", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 4", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 3", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 3", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 2", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 2", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 1", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 1", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													end
-												else
-													for L_399_forvar0, L_400_forvar1 in pairs(Enemies:GetChildren()) do
-														local L_401_ = {}
-														L_401_[2], L_401_[3] = L_399_forvar0, L_400_forvar1
-														if L_401_[3]:FindFirstChild("HumanoidRootPart") and (L_401_[3]:FindFirstChild("Humanoid") and ((L_401_[3]:FindFirstChild("Humanoid"))["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["CFrame"]["Position"] - L_401_[3]["HumanoidRootPart"]["CFrame"]["Position"])["Magnitude"] <= 5000)) then
-															repeat
-																local L_402_ = {}
-																Utils["wt"](.1)
-																if Select_Map == "Magma" or Select_Map == "Flame" then
-																	for L_403_forvar0, L_404_forvar1 in pairs(Workspace:GetDescendants()) do
-																		local L_405_ = {}
-																		L_405_[3], L_405_[1] = L_403_forvar0, L_404_forvar1
-																		if L_405_[1]["Name"] == "Lava" then
-																			L_405_[1]:Destroy()
-																		end
-																	end
-																end
-																L_402_[1] = math["random"](1, 5)
-																if L_402_[1] == 1 then
-																	L_402_[2] = CFrame["new"](0, 30, 1)
-																elseif L_402_[1] == 2 then
-																	L_402_[2] = CFrame["new"](0, 30, 15)
-																elseif L_402_[1] == 3 then
-																	L_402_[2] = CFrame["new"](1, 30, -15)
-																elseif L_402_[1] == 4 then
-																	L_402_[2] = CFrame["new"](15, 30, 0)
-																elseif L_402_[1] == 5 then
-																	L_402_[2] = CFrame["new"](-15, 30, 0)
-																end
-																TeleportTo(L_401_[3]["HumanoidRootPart"]["CFrame"] * L_402_[2], 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															until not L_401_[3]["Parent"] or L_401_[3]["Humanoid"]["Health"] <= 0 or #Utils["GetMobRaid"]() == 0
-														end
-													end
-												end
-											else
-												if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-													Select_Map = "Dark"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-													Select_Map = "Sand"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-													Select_Map = "Magma"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-													Select_Map = "Rumble"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-													Select_Map = "Flame"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-													Select_Map = "Ice"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-													Select_Map = "Light"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-													Select_Map = "String"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-													Select_Map = "Quake"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-													Select_Map = "Buddha"
-												else
-													Select_Map = "Ice"
-												end
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-												Utils["wt"](.2)
-												if Player["Backpack"]:FindFirstChild("Special Microchip") or Player["Character"]:FindFirstChild("Special Microchip") and Player["Character"]["Humanoid"]["Health"] > 0 then
-													if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-														local L_406_ = {}
-														fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-														L_406_[1] = 0
-														repeat
-															L_406_[1] = L_406_[1] + 1
-															Utils["wt"](1)
-														until L_406_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-													elseif PlaceId == 7449423635 then
-														TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-														if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-															if Player["Character"]["Humanoid"]["Health"] > 0 then
-																local L_407_ = {}
-																fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																L_407_[2] = 0
-																repeat
-																	L_407_[2] = L_407_[2] + 1
-																	Utils["wt"](1)
-																until L_407_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-															end
-														end
-													end
-												else
-													if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-														if Player["Data"]["Fragments"]["Value"] >= 5000 then
-															if Player["Data"]["Beli"]["Value"] >= 3000000 then
-														        if World3 then
-                                                                    Player.Character.Humanoid.PlatformStand = true
-                                                                    topos(CFrame.new(5663, 1211, 861))
-                                                                    Player.Character.Humanoid.PlatformStand = false
-                                                                    Player.Character.HumanoidRootPart.Anchored = true
-                                                                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                                                                    task.wait(0.5)
-                                                                    Player.Character.HumanoidRootPart.Anchored = false
-                                                                end
-																Dragon_Talon_C = true
-																return
-															end
-															return
-														end
-														table["sort"](Utils["GetFruits"](), function(L_408_arg0, L_409_arg1)
-															local L_410_ = {}
-															L_410_[1], L_410_[2] = L_408_arg0, L_409_arg1
-															if L_410_[1]["Value"] < 100000 and L_410_[1]["Value"] < 100000 then
-																return L_410_[1]["Value"] < L_410_[2]["Value"]
-															end
-														end)
-														Utils["wt"](1)
-														if #Utils["GetFruits"]() > 0 and not Dragon_Talon_C then
-															warn()
-															Utils["wt"](2)
-															if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-																if Player["Character"]["Humanoid"]["Health"] > 0 and Player["Data"]["Fragments"]["Value"] < 5000 then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadFruit", (Utils["GetFruits"]())[1]["Name"])
-																elseif Fragments["Value"] < 5000 then
-																	break
-																end
-																if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-																	Select_Map = "Dark"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-																	Select_Map = "Sand"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-																	Select_Map = "Magma"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-																	Select_Map = "Rumble"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-																	Select_Map = "Flame"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-																	Select_Map = "Ice"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-																	Select_Map = "Light"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-																	Select_Map = "String"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-																	Select_Map = "Quake"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-																	Select_Map = "Buddha"
-																else
-																	Select_Map = "Ice"
-																end
-																ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-																if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-																	local L_411_ = {}
-																	fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																	L_411_[2] = 0
-																	repeat
-																		L_411_[2] = L_411_[2] + 1
-																		Utils["wt"](1)
-																	until L_411_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																elseif PlaceId == 7449423635 then
-																	TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-																	if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-																		if Player["Character"]["Humanoid"]["Health"] > 0 then
-																			local L_412_ = {}
-																			fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																			L_412_[1] = 0
-																			repeat
-																				L_412_[1] = L_412_[1] + 1
-																				Utils["wt"](1)
-																			until L_412_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																		end
-																	end
-																end
-															end
-														else
-															Quest = nil
-															SetStatusFarm("Farming Level")
-															FuncA()
-														end
-													end
-												end
-											end
-										end
-									end
-								until Dragon_Talon_C
-							end
-							return
-						end
-						if Dragon_Talon_C_M and (not God_Human_C and Level["Value"] >= 1100) then
-							if not God_Human_C then
-								repeat
-									Utils["wt"]()
-									Attack()
-									if Utils["ffc"](Player["Backpack"], "Godhuman") or Utils["ffc"](Player["Character"], "Godhuman") then
-										God_Human_C = true
-										return
-									end
-									if not God_Human_C and Level["Value"] >= 1100 then
-										if Fragments["Value"] >= 5000 then
-											if Beli["Value"] >= 5000000 then
-												Quest = "Godhuman"
-											else
-												Attack()
-												Quest = nil
-												SetStatusFarm("Farming Level")
-												FuncA()
-											end
-										elseif Fragments["Value"] < 5000 then
-											if Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] and (Fragments["Value"] < 5000 and not God_Human_C) then
-												SetStatusFarm("Farm Raid")
-												if #Utils["GetMobRaid"]() == 0 then
-													if Select_Map == "Magma" or Select_Map == "Flame" then
-														for L_413_forvar0, L_414_forvar1 in pairs(Workspace:GetDescendants()) do
-															local L_415_ = {}
-															L_415_[3], L_415_[1] = L_413_forvar0, L_414_forvar1
-															if L_415_[1]["Name"] == "Lava" then
-																L_415_[1]:Destroy()
-															end
-														end
-													end
-													if Utils["GetRaid"]("Island 5", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 5", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 4", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 4", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 3", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 3", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 2", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 2", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													elseif Utils["GetRaid"]("Island 1", 2500) ~= nil then
-														TeleportTo((Utils["GetRaid"]("Island 1", 2500))["CFrame"] * CFrame["new"](0, 120, 0), 1.5)
-													end
-												else
-													for L_416_forvar0, L_417_forvar1 in pairs(Enemies:GetChildren()) do
-														local L_418_ = {}
-														L_418_[2], L_418_[1] = L_416_forvar0, L_417_forvar1
-														if L_418_[1]:FindFirstChild("HumanoidRootPart") and (L_418_[1]:FindFirstChild("Humanoid") and ((L_418_[1]:FindFirstChild("Humanoid"))["Health"] > 0 and (Player["Character"]["HumanoidRootPart"]["CFrame"]["Position"] - L_418_[1]["HumanoidRootPart"]["CFrame"]["Position"])["Magnitude"] <= 5000)) then
-															repeat
-																local L_419_ = {}
-																Utils["wt"](.1)
-																if Select_Map == "Magma" or Select_Map == "Flame" then
-																	for L_420_forvar0, L_421_forvar1 in pairs(Workspace:GetDescendants()) do
-																		local L_422_ = {}
-																		L_422_[2], L_422_[1] = L_420_forvar0, L_421_forvar1
-																		if L_422_[1]["Name"] == "Lava" then
-																			L_422_[1]:Destroy()
-																		end
-																	end
-																end
-																L_419_[2] = math["random"](1, 5)
-																if L_419_[2] == 1 then
-																	L_419_[1] = CFrame["new"](0, 30, 1)
-																elseif L_419_[2] == 2 then
-																	L_419_[1] = CFrame["new"](0, 30, 15)
-																elseif L_419_[2] == 3 then
-																	L_419_[1] = CFrame["new"](1, 30, -15)
-																elseif L_419_[2] == 4 then
-																	L_419_[1] = CFrame["new"](15, 30, 0)
-																elseif L_419_[2] == 5 then
-																	L_419_[1] = CFrame["new"](-15, 30, 0)
-																end
-																TeleportTo(L_418_[1]["HumanoidRootPart"]["CFrame"] * L_419_[1], 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															until not L_418_[1]["Parent"] or L_418_[1]["Humanoid"]["Health"] <= 0 or #Utils["GetMobRaid"]() == 0
-														end
-													end
-												end
-											else
-												if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-													Select_Map = "Dark"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-													Select_Map = "Sand"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-													Select_Map = "Magma"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-													Select_Map = "Rumble"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-													Select_Map = "Flame"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-													Select_Map = "Ice"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-													Select_Map = "Light"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-													Select_Map = "String"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-													Select_Map = "Quake"
-												elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-													Select_Map = "Buddha"
-												else
-													Select_Map = "Ice"
-												end
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-												Utils["wt"](.2)
-												if Player["Backpack"]:FindFirstChild("Special Microchip") or Player["Character"]:FindFirstChild("Special Microchip") and Player["Character"]["Humanoid"]["Health"] > 0 then
-													if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-														local L_423_ = {}
-														fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-														L_423_[2] = 0
-														repeat
-															L_423_[2] = L_423_[2] + 1
-															Utils["wt"](1)
-														until L_423_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-													elseif PlaceId == 7449423635 then
-														TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-														if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-															if Player["Character"]["Humanoid"]["Health"] > 0 then
-																local L_424_ = {}
-																fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																L_424_[1] = 0
-																repeat
-																	L_424_[1] = L_424_[1] + 1
-																	Utils["wt"](1)
-																until L_424_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-															end
-														end
-													end
-												else
-													if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-														if Player["Data"]["Fragments"]["Value"] >= 5000 then
-															if Player["Data"]["Beli"]["Value"] >= 3000000 then
-                    									        if World3 then
-                                                                    Player.Character.Humanoid.PlatformStand = true
-                                                                    topos(CFrame.new(-12551, 337, -7476))
-                                                                    task.wait(1)
-                                                                    topos(CFrame.new(-13775.5732421875, 334.93670654296875, -9881.7685546875))
-                                                                    Player.Character.Humanoid.PlatformStand = false
-                                                                    Player.Character.HumanoidRootPart.Anchored = true
-                                                                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyGodhuman")
-                                                                    task.wait(0.5)
-                                                                    SendWebhook("Purchased GodHuman!")
-                                                                    Player.Character.HumanoidRootPart.Anchored = false
-                                                                end
-																God_Human_C = true
-																return
-															end
-															return
-														end
-														table["sort"](Utils["GetFruits"](), function(L_425_arg0, L_426_arg1)
-															local L_427_ = {}
-															L_427_[2], L_427_[1] = L_425_arg0, L_426_arg1
-															if L_427_[2]["Value"] < 100000 and L_427_[2]["Value"] < 100000 then
-																return L_427_[2]["Value"] < L_427_[1]["Value"]
-															end
-														end)
-														Utils["wt"](1)
-														if #Utils["GetFruits"]() > 0 and not God_Human_C then
-															warn()
-															Utils["wt"](2)
-															if not Player["PlayerGui"]["Main"]["TopHUDList"]["RaidTimer"]["Visible"] then
-																if Player["Character"]["Humanoid"]["Health"] > 0 and Player["Data"]["Fragments"]["Value"] < 5000 then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LoadFruit", (Utils["GetFruits"]())[1]["Name"])
-																elseif Fragments["Value"] < 5000 then
-																	break
-																end
-																if Player["Data"]["DevilFruit"]["Value"] == "Dark-Dark" then
-																	Select_Map = "Dark"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Sand-Sand" then
-																	Select_Map = "Sand"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Magma-Magma" then
-																	Select_Map = "Magma"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Rumble-Rumble" then
-																	Select_Map = "Rumble"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Flame-Flame" then
-																	Select_Map = "Flame"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Ice-Ice" then
-																	Select_Map = "Ice"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Light-Light" then
-																	Select_Map = "Light"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "String-String" then
-																	Select_Map = "String"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Quake-Quake" then
-																	Select_Map = "Quake"
-																elseif Player["Data"]["DevilFruit"]["Value"] == "Buddha-Buddha" then
-																	Select_Map = "Buddha"
-																else
-																	Select_Map = "Ice"
-																end
-																ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("RaidsNpc", "Select", Select_Map)
-																if PlaceId == 4442272183 and Player["Character"]["Humanoid"]["Health"] > 0 then
-																	local L_428_ = {}
-																	fireclickdetector(Workspace["Map"]["CircleIsland"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																	L_428_[2] = 0
-																	repeat
-																		L_428_[2] = L_428_[2] + 1
-																		Utils["wt"](1)
-																	until L_428_[2] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																elseif PlaceId == 7449423635 then
-																	TeleportTo(CFrame["new"](-5034, 315, -2951), 1.5)
-																	if ((CFrame["new"](-5034, 315, -2951))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-																		if Player["Character"]["Humanoid"]["Health"] > 0 then
-																			local L_429_ = {}
-																			fireclickdetector(Workspace["Map"]["Boat Castle"]["RaidSummon2"]["Button"]["Main"]["ClickDetector"], 1)
-																			L_429_[1] = 0
-																			repeat
-																				L_429_[1] = L_429_[1] + 1
-																				Utils["wt"](1)
-																			until L_429_[1] >= 20 or Player["PlayerGui"]["Main"]["Timer"]["Visible"]
-																		end
-																	end
-																end
-															end
-														else
-															Quest = nil
-															SetStatusFarm("Farming Level")
-															FuncA()
-														end
-													end
-												end
-											end
-										end
-									end
-								until God_Human_C
-							end
-							return
-						end
-						if Level["Value"] >= 700 and (not New_World and not Three_World) then
-							Quest = "World 2"
-							return
-						end
-						if New_World and (CheckFindWaterKey and (Level["Value"] >= 1500 and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TalkTrevor", "1") == 0 and (not Utils["IsHall"]() and Utils["IsHeavenly"]())))) then
-							Quest = "TravelZou"
-							return
-						end
-						Quest = nil
-						SetStatusFarm("Farming Level")
-						FuncA()
-					end
-				end
-			end
-		end, warn)
-	end
-end)
-task["spawn"](function()
-	while Utils["wt"]() do
-		xpcall(function()
-			if Quest ~= nil then
-				SetStatusFarm(Quest)
-			end
-			if Quest == "Saber" then
-				local L_430_ = {}
-				if not old_World then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelMain")
-				end
-				L_430_[2] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress")
-				if L_430_[2]["UsedTorch"] == false then
-					for L_431_forvar0, L_432_forvar1 in pairs((game:GetService("Workspace"))["Map"]["Jungle"]["QuestPlates"]:GetChildren()) do
-						local L_433_ = {}
-						L_433_[3], L_433_[2] = L_431_forvar0, L_432_forvar1
-						if table["find"]({
-							"Plate1",
-							"Plate2",
-							"Plate3",
-							"Plate4";
-							"Plate5"
-						}, L_433_[2]["Name"]) then
-							L_433_[2]["Button"]["CFrame"] = Player["Character"]["HumanoidRootPart"]["CFrame"]
-						end
-					end
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "GetTorch")
-					Utils["Equip"]("Torch")
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "DestroyTorch")
-				elseif L_430_[2]["UsedCup"] == false then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "GetCup")
-					Utils["Equip"]("Cup")
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "FillCup", (game:GetService("Players"))["LocalPlayer"]["Character"]["Cup"])
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "SickMan")
-				elseif L_430_[2]["KilledMob"] == false then
-					local L_434_ = {}
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "RichSon")
-					L_434_[2] = Utils["ffc"](Enemies, "Mob Leader")
-					if L_434_[2] then
-						for L_435_forvar0, L_436_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_437_ = {}
-							L_437_[2], L_437_[3] = L_435_forvar0, L_436_forvar1
-							if L_437_[3]["Name"] == "Mob Leader" then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_437_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 20, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_437_[3]["Parent"] or L_437_[3]["Humanoid"]["Health"] <= 0 or Utils["gi"]("Saber")
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "RichSon")
-							end
-						end
-					else
-						TeleportTo(CFrame["new"](-2848.59399, 7.4272871, 5342.44043), 1.5)
-					end
-				elseif L_430_[2]["UsedRelic"] == false then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ProQuestProgress", "RichSon")
-					Utils["Equip"]("Relic")
-					TeleportTo(CFrame["new"](-1406.60925, 29.8520069, 4.5805192), 1.5)
-				else
-					if Utils["ffc"](Enemies, "Saber Expert") then
-						for L_438_forvar0, L_439_forvar1 in pairs((game:GetService("Workspace"))["Enemies"]:GetChildren()) do
-							local L_440_ = {}
-							L_440_[1], L_440_[3] = L_438_forvar0, L_439_forvar1
-							if L_440_[3]["Name"] == "Saber Expert" then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_440_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 25, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_440_[3]["Parent"] or L_440_[3]["Humanoid"]["Health"] <= 0 or Utils["gi"]("Saber")
-							end
-						end
-					else
-						TeleportTo(CFrame["new"](-1458.89502, 29.8870335, -50.633564, .858821094, 1.13848939e-08, .512275636, -4.85649254e-09, 1, -1.40823326e-08, -0.512275636, 9.6063415e-09, .858821094), 1.5)
-						if ((CFrame["new"](-1458.89502, 29.8870335, -50.633564, .858821094, 1.13848939e-08, .512275636, -4.85649254e-09, 1, -1.40823326e-08, -0.512275636, 9.6063415e-09, .858821094))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-							Utils["wt"](.5)
-							if not Utils["ffc"](Enemies, "Saber Expert") then
-							    if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                    task.wait(TimeHop)
-                                    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								else
-								    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								end
-								Utils["wt"](.1)
-								TeleportService:Teleport(PlaceId, Player)
-							end
-						end
-					end
-				end
-			elseif Quest == "World 2" then
-				local L_441_ = {}
-				L_441_[1] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer(TableConcat({
-					"DressrosaQuestProgre";
-					"ss"
-				}))
-				if L_441_[1]["UsedKey"] == false then
-					TeleportTo(CFrame["new"](1347.32947, 37.349369, -1325.44922, .538348913, 8.57539106e-08, .842722058, 8.61935634e-10, 1, -1.0230886e-07, -0.842722058, 5.58042359e-08, .538348913), 1.5)
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer(TableConcat({
-						"DressrosaQuestProgre",
-						"ss"
-					}), "Detective")
-					Utils["Equip"]("Key")
-				elseif L_441_[1]["KilledIceBoss"] == false then
-					if Utils["ffc"](Enemies, "Ice Admiral") then
-						for L_442_forvar0, L_443_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_444_ = {}
-							L_444_[1], L_444_[2] = L_442_forvar0, L_443_forvar1
-							if L_444_[2]["Name"] == "Ice Admiral" and L_444_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"](.1)
-									TeleportTo(L_444_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 20, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_444_[2]["Parent"] or L_444_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or L_441_[1]["KilledIceBoss"]
-								Utils["wt"](2)
-								ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-								TleP = true
-								Utils["wt"](25)
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Ice Admiral") then
-						TeleportTo(CFrame["new"](1144.5270996094, 7.3292083740234, -1164.7322998047), 1.5)
-					end
-				elseif L_441_[1]["KilledIceBoss"] == true then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-					TleP = true
-					Utils["wt"](25)
-				end
-			elseif Quest == "Pole (1st Form)" then
-				if not Utils["CheckBoss"]("Thunder God") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Thunder God") then
-						for L_445_forvar0, L_446_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_447_ = {}
-							L_447_[3], L_447_[1] = L_445_forvar0, L_446_forvar1
-							if L_447_[1]["Name"] == "Thunder God" and L_447_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_447_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_447_[1]["Parent"] or L_447_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Thunder God")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Thunder God") then
-						for L_448_forvar0, L_449_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_450_ = {}
-							L_450_[2], L_450_[3] = L_448_forvar0, L_449_forvar1
-							if L_450_[3]["Name"] == "Thunder God" and L_450_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_450_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_450_[3]["Parent"] or L_450_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Thunder God")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Thunder God")
-			elseif Quest == "Shark Saw" then
-				if not Utils["CheckBoss"]("The Saw") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "The Saw") then
-						for L_451_forvar0, L_452_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_453_ = {}
-							L_453_[1], L_453_[3] = L_451_forvar0, L_452_forvar1
-							if L_453_[3]["Name"] == "The Saw" and L_453_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_453_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_453_[3]["Parent"] or L_453_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("The Saw")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "The Saw") then
-						for L_454_forvar0, L_455_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_456_ = {}
-							L_456_[1], L_456_[3] = L_454_forvar0, L_455_forvar1
-							if L_456_[3]["Name"] == "The Saw" and L_456_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_456_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_456_[3]["Parent"] or L_456_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("The Saw")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("The Saw")
-			elseif Quest == "Flail" then
-				if not Utils["CheckBoss"]("Smoke Admiral") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Smoke Admiral") then
-						for L_457_forvar0, L_458_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_459_ = {}
-							L_459_[2], L_459_[1] = L_457_forvar0, L_458_forvar1
-							if L_459_[1]["Name"] == "Smoke Admiral" and L_459_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_459_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_459_[1]["Parent"] or L_459_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Smoke Admiral")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Smoke Admiral") then
-						for L_460_forvar0, L_461_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_462_ = {}
-							L_462_[1], L_462_[2] = L_460_forvar0, L_461_forvar1
-							if L_462_[2]["Name"] == "Smoke Admiral" and L_462_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_462_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_462_[2]["Parent"] or L_462_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Smoke Admiral")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Smoke Admiral")
-			elseif Quest == "Wardens Sword" then
-				if not Utils["CheckBoss"]("Chief Warden") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Chief Warden") then
-						for L_463_forvar0, L_464_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_465_ = {}
-							L_465_[2], L_465_[1] = L_463_forvar0, L_464_forvar1
-							if L_465_[1]["Name"] == "Chief Warden" and L_465_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_465_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_465_[1]["Parent"] or L_465_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Chief Warden")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Chief Warden") then
-						for L_466_forvar0, L_467_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_468_ = {}
-							L_468_[1], L_468_[2] = L_466_forvar0, L_467_forvar1
-							if L_468_[2]["Name"] == "Chief Warden" and L_468_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_468_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_468_[2]["Parent"] or L_468_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Chief Warden")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("The Saw")
-			elseif Quest == "Magma Blaster" then
-				if not Utils["CheckBoss"]("Magma Admiral") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Magma Admiral") then
-						for L_469_forvar0, L_470_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_471_ = {}
-							L_471_[1], L_471_[2] = L_469_forvar0, L_470_forvar1
-							if L_471_[2]["Name"] == "Magma Admiral" and L_471_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_471_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_471_[2]["Parent"] or L_471_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Magma Admiral")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Magma Admiral") then
-						for L_472_forvar0, L_473_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_474_ = {}
-							L_474_[2], L_474_[3] = L_472_forvar0, L_473_forvar1
-							if L_474_[3]["Name"] == "Magma Admiral" and L_474_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_474_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_474_[3]["Parent"] or L_474_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Magma Admiral")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Magma Admiral")
-			elseif Quest == "Bazooka" then
-				if not Utils["CheckBoss"]("Wysper") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Wysper") then
-						for L_475_forvar0, L_476_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_477_ = {}
-							L_477_[3], L_477_[2] = L_475_forvar0, L_476_forvar1
-							if L_477_[2]["Name"] == "Wysper" and L_477_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_477_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_477_[2]["Parent"] or L_477_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Wysper")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Wysper") then
-						for L_478_forvar0, L_479_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_480_ = {}
-							L_480_[3], L_480_[1] = L_478_forvar0, L_479_forvar1
-							if L_480_[1]["Name"] == "Wysper" and L_480_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_480_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_480_[1]["Parent"] or L_480_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Wysper")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Wysper")
-			elseif Quest == "Twin Hooks" then
-				if not Utils["CheckBoss"]("Captain Elephant") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Captain Elephant") then
-						for L_481_forvar0, L_482_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_483_ = {}
-							L_483_[2], L_483_[3] = L_481_forvar0, L_482_forvar1
-							if L_483_[3]["Name"] == "Captain Elephant" and L_483_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_483_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_483_[3]["Parent"] or L_483_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Captain Elephant")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Captain Elephant") then
-						for L_484_forvar0, L_485_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_486_ = {}
-							L_486_[1], L_486_[2] = L_484_forvar0, L_485_forvar1
-							if L_486_[2]["Name"] == "Captain Elephant" and L_486_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									if ((CFrame["new"](-7894.6181640625, 5547.1420898438, -380.29098510742))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 7500 then
-										((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer("requestEntrance", vector["create"](-7894.6181640625, 5547.1420898438, -380.29098510742))
-									end
-									TeleportTo(L_486_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_486_[2]["Parent"] or L_486_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Captain Elephant")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Wysper")
-			elseif Quest == "Gravity Blade" then
-				if not Utils["CheckBoss"]("Orbitus") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Orbitus") then
-						for L_487_forvar0, L_488_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_489_ = {}
-							L_489_[2], L_489_[1] = L_487_forvar0, L_488_forvar1
-							if L_489_[1]["Name"] == "Orbitus" and L_489_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_489_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_489_[1]["Parent"] or L_489_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Orbitus")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Orbitus") then
-						for L_490_forvar0, L_491_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_492_ = {}
-							L_492_[3], L_492_[2] = L_490_forvar0, L_491_forvar1
-							if L_492_[2]["Name"] == "Orbitus" and L_492_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_492_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_492_[2]["Parent"] or L_492_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Orbitus")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Orbitus")
-			elseif Quest == "Longsword" then
-				if not Utils["CheckBoss"]("Diamond") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Diamond") then
-						for L_493_forvar0, L_494_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_495_ = {}
-							L_495_[3], L_495_[2] = L_493_forvar0, L_494_forvar1
-							if L_495_[2]["Name"] == "Diamond" and L_495_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_495_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_495_[2]["Parent"] or L_495_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Diamond")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Diamond") then
-						for L_496_forvar0, L_497_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_498_ = {}
-							L_498_[2], L_498_[3] = L_496_forvar0, L_497_forvar1
-							if L_498_[3]["Name"] == "Diamond" and L_498_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_498_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_498_[3]["Parent"] or L_498_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Diamond")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Diamond")
-			elseif Quest == "Rengoku" then
-				if not Utils["CheckBoss"]("Awakened Ice Admiral") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Awakened Ice Admiral") then
-						for L_499_forvar0, L_500_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_501_ = {}
-							L_501_[3], L_501_[2] = L_499_forvar0, L_500_forvar1
-							if L_501_[2]["Name"] == "Awakened Ice Admiral" and L_501_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_501_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_501_[2]["Parent"] or L_501_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Awakened Ice Admiral")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Awakened Ice Admiral") then
-						for L_502_forvar0, L_503_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_504_ = {}
-							L_504_[3], L_504_[2] = L_502_forvar0, L_503_forvar1
-							if L_504_[2]["Name"] == "Awakened Ice Admiral" and L_504_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_504_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_504_[2]["Parent"] or L_504_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Awakened Ice Admiral")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Awakened Ice Admiral")
-			elseif Quest == "BartiloQuest" then
-				if New_World then
-					local L_505_ = {}
-					L_505_[1] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BartiloQuestProgress")
-					if L_505_[1]["KilledBandits"] == false then
-						if Player["PlayerGui"]["Main"]["Quest"]["Visible"] and (Utils["sf"](Player["PlayerGui"]["Main"]["Quest"]["Container"]["QuestTitle"]["Title"]["Text"], "Swan Pirates") and Utils["sf"](Player["PlayerGui"]["Main"]["Quest"]["Container"]["QuestTitle"]["Title"]["Text"], "50")) then
-							if Utils["ffc"](Enemies, "Swan Pirate") then
-								for L_506_forvar0, L_507_forvar1 in pairs(Enemies:GetChildren()) do
-									local L_508_ = {}
-									L_508_[1], L_508_[2] = L_506_forvar0, L_507_forvar1
-									if L_508_[2]["Name"] == "Swan Pirate" and L_508_[2]["Humanoid"]["Health"] > 0 then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("SetSpawnPoint")
-										repeat
-											Utils["wt"]()
-											Utils["BN"](L_508_[2]["Name"])
-											TeleportTo(L_508_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-											if not Utils["ffc"](Player["Character"], "HasBuso") then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-											end
-											Attack()
-										until (L_508_[2]["HumanoidRootPart"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 50 or L_508_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-									end
-								end
-							else
-								TeleportTo(CFrame["new"](976.467651, 111.174057, 1229.1084), 1.5)
-							end
-						else
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("StartQuest", "BartiloQuest", 1)
-						end
-					elseif L_505_[1]["KilledSpring"] == false then
-						if Utils["ffc"](Enemies, "Jeremy") then
-							for L_509_forvar0, L_510_forvar1 in pairs(Enemies:GetChildren()) do
-								local L_511_ = {}
-								L_511_[3], L_511_[1] = L_509_forvar0, L_510_forvar1
-								if L_511_[1]["Name"] == "Jeremy" then
-									repeat
-										Utils["wt"]()
-										TeleportTo(L_511_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-										if not game["Players"]["LocalPlayer"]["Character"]:FindFirstChild("HasBuso") then
-											ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-										end
-										Attack()
-									until not L_511_[1]["Parent"] or L_511_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-								end
-							end
-						elseif Utils["ffc"](ReplicatedStorage, "Jeremy") then
-							TeleportTo((ReplicatedStorage:FindFirstChild("Jeremy"))["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-						elseif not Utils["ffc"](Enemies, "Jeremy") and not Utils["ffc"](ReplicatedStorage, "Jeremy") then
-							FuncA()
-						end
-					elseif L_505_[1]["DidPlates"] == false then
-						repeat
-							Utils["wt"](.3)
-							TeleportTo(CFrame["new"](-1836, 11, 1714), 1.5)
-						until (Vector3["new"](-1836, 11, 1714) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] < 10
-						Utils["wt"](1)
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BartiloQuestProgress", "DidPlates")
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-				end
-			elseif Quest == "Find Water Key" then
-				if New_World then
-					if Player["Backpack"]:FindFirstChild("Water Key") or Utils["ffc"](Player["Character"], "Water Key") then
-						SetStatusFarm("Using Water Key")
-						Utils["Equip"]("Water Key")
-						Utils["wait"](0)
-                        if World2 then
-                            topos(CFrame.new(-2601.416259765625, 239.27285766601562, -10312.27734375))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                            task.wait(0.5)
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        elseif World3 then
-                            topos(CFrame.new(-4971.24365234375, 314.0325622558594, -3223.034912109375))
-                            Player.Character.Humanoid.PlatformStand = false
-                            Player.Character.HumanoidRootPart.Anchored = true
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate",true)
-                            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuySharkmanKarate")
-                            task.wait(0.5)
-                            Player.Character.HumanoidRootPart.Anchored = false
-                        end
-						CheckFindWaterKey = true
-					elseif not Utils["ffc"](Player["Backpack"], "Water Key") and not Utils["ffc"](Player["Character"], "Water Key") then
-						if Utils["ffc"](Enemies, "Tide Keeper") then
-							for L_512_forvar0, L_513_forvar1 in pairs(Enemies:GetChildren()) do
-								local L_514_ = {}
-								L_514_[1], L_514_[2] = L_512_forvar0, L_513_forvar1
-								if L_514_[2]["Name"] == "Tide Keeper" and (L_514_[2]:FindFirstChild("Humanoid") and (L_514_[2]:FindFirstChild("Humanoid"))["Health"] > 0) then
-									repeat
-										task["wait"]()
-										TeleportTo(L_514_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-										if not Utils["ffc"](Player["Character"], "HasBuso") then
-											ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-										end
-										Attack()
-									until not L_514_[2]["Parent"] or L_514_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-								end
-							end
-						elseif Utils["ffc"](ReplicatedStorage, "Tide Keeper") then
-							for L_515_forvar0, L_516_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-								local L_517_ = {}
-								L_517_[1], L_517_[2] = L_515_forvar0, L_516_forvar1
-								if L_517_[2]["Name"] == "Tide Keeper" and (L_517_[2]:FindFirstChild("Humanoid") and (L_517_[2]:FindFirstChild("Humanoid"))["Health"] > 0) then
-									repeat
-										Utils["wt"]()
-										TeleportTo(L_517_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-										if not Utils["ffc"](Player["Character"], "HasBuso") then
-											ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-										end
-										Attack()
-									until not L_517_[2]["Parent"] or L_517_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-								end
-							end
-						else
-							if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    							require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                task.wait(TimeHop)
-                                require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-							else
-								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-							end
-							Utils["wt"](.1)
-							TeleportService:Teleport(PlaceId, Player)
-						end
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-				end
-			elseif Quest == "Evo Race V1" then
-				if New_World then
-					if Start_Quest_Evo_V1 then
-						if not Utils["ffc"](Player["Backpack"], "Flower 3") and not Utils["ffc"](Player["Character"], "Flower 3") then
-							if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](976.467651, 111.174057, 1229.1084))["Magnitude"] <= 800 then
-								for L_518_forvar0, L_519_forvar1 in pairs(Enemies:GetChildren()) do
-									local L_520_ = {}
-									L_520_[2], L_520_[1] = L_518_forvar0, L_519_forvar1
-									if L_520_[1]["Humanoid"]["Health"] > 0 and (L_520_[1]["HumanoidRootPart"]["Position"] - Vector3["new"](976.467651, 111.174057, 1229.1084))["Magnitude"] <= 800 then
-										repeat
-											Utils["wt"]()
-											TeleportTo(L_520_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-											if not Utils["ffc"](Player["Character"], "HasBuso") then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-											end
-											Attack()
-										until not L_520_[1]["Parent"] or L_520_[1]["Humanoid"]["Health"] <= 0 or Utils["ffc"](Player["Backpack"], "Flower 3") or Utils["ffc"](Player["Character"], "Flower 3") or not(getgenv())["AutoFarm"]
-									end
-								end
-							else
-								TeleportTo(CFrame["new"](976.467651, 111.174057, 1229.1084), 1.5)
-							end
-						elseif not Utils["ffc"](Player["Backpack"], "Flower 2") and not Utils["ffc"](Player["Character"], "Flower 2") then
-							if Utils["ffc"](Workspace, "Flower2") then
-								TeleportTo(Workspace["Flower2"]["CFrame"], 1.5)
-								if (Player["Character"]["HumanoidRootPart"]["Position"] - Workspace["Flower2"]["Position"])["Magnitude"] <= 5 then
-									VirtualInputManager:SendKeyEvent(true, "Space", false, game)
-									Utils["wt"](.5)
-									VirtualInputManager:SendKeyEvent(false, "Space", false, game)
-								end
-							end
-						elseif not Utils["ffc"](Player["Backpack"], "Flower 1") and not Utils["ffc"](Player["Character"], "Flower 1") then
-							TeleportTo(Workspace["Flower1"]["CFrame"], 1.5)
-							if (Player["Character"]["HumanoidRootPart"]["Position"] - Workspace["Flower1"]["Position"])["Magnitude"] <= 5 and Workspace["Flower1"]["Transparency"] == 0 then
-								VirtualInputManager:SendKeyEvent(true, "Space", false, game)
-								Utils["wt"](.5)
-								VirtualInputManager:SendKeyEvent(false, "Space", false, game)
-							end
-							Utils["wt"](1)
-						else
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Alchemist", "3")
-						end
-					else
-						if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Alchemist", "1") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Alchemist", "1") == 2 then
-							Start_Quest_Evo_V1 = true
-						end
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Alchemist", "2")
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-				end
-			elseif Quest == "Evo Race V2" then
-				if New_World then
-					if Player["Data"]["Race"]["Value"] == "Human" then
-						if Quest_Start_Evo_Human_V3 then
-							if not Utils["ffc"](Enemies, "Orbitus") and (not Utils["ffc"](ReplicatedStorage, "Orbitus") and not Kill_Orbitus) then
-								Utils["HopLowServer"](4)
-								wait(.2)
-							    if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                    task.wait(TimeHop)
-                                    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								else
-								    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								end
-								Utils["wt"](.1)
-								TeleportService:Teleport(PlaceId, Player)
-							end
-							if not Utils["ffc"](Enemies, "Jeremy") and (not Utils["ffc"](ReplicatedStorage, "Jeremy") and not Kill_Jeremy) then
-								Utils["HopLowServer"](4)
-								wait(.2)
-							    if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                    task.wait(TimeHop)
-                                    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								else
-								    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								end
-								Utils["wt"](.1)
-								TeleportService:Teleport(PlaceId, Player)
-							end
-							if not Utils["ffc"](Enemies, "Diamond") and (not Utils["ffc"](ReplicatedStorage, "Diamond") and not Kill_Diamond) then
-								Utils["HopLowServer"](4)
-								wait(.2)
-							    if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                    task.wait(TimeHop)
-                                    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								else
-								    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								end
-								Utils["wt"](.1)
-								TeleportService:Teleport(PlaceId, Player)
-							end
-							if not Kill_Orbitus then
-								repeat
-									Utils["wt"]()
-									pcall(function()
-										if Utils["ffc"](Enemies, "Orbitus") or Utils["ffc"](ReplicatedStorage, "Orbitus") then
-											if Utils["ffc"](Enemies, "Orbitus") then
-												for L_521_forvar0, L_522_forvar1 in pairs(Enemies:GetChildren()) do
-													local L_523_ = {}
-													L_523_[3], L_523_[1] = L_521_forvar0, L_522_forvar1
-													if L_523_[1]["Name"] == "Orbitus" and L_523_[1]["Humanoid"]["Health"] > 0 then
-														repeat
-															Utils["wt"]()
-															if L_523_[1]:FindFirstChild("HumanoidRootPart") then
-																TeleportTo(L_523_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															else
-																Kill_Orbitus = true
-																break
-															end
-														until not L_523_[1]["Parent"] or L_523_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-														Kill_Orbitus = true
-													end
-												end
-											elseif Utils["ffc"](ReplicatedStorage, "Orbitus") then
-												TeleportTo(ReplicatedStorage["Orbitus"]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-											end
-										end
-									end)
-								until Kill_Orbitus
-							end
-							if not Kill_Jeremy then
-								repeat
-									Utils["wt"]()
-									pcall(function()
-										if Utils["ffc"](Enemies, "Jeremy") or Utils["ffc"](ReplicatedStorage, "Jeremy") then
-											if Utils["ffc"](Enemies, "Jeremy") then
-												for L_524_forvar0, L_525_forvar1 in pairs(Enemies:GetChildren()) do
-													local L_526_ = {}
-													L_526_[2], L_526_[3] = L_524_forvar0, L_525_forvar1
-													if L_526_[3]["Name"] == "Jeremy" and L_526_[3]["Humanoid"]["Health"] > 0 then
-														repeat
-															Utils["wt"]()
-															if L_526_[3]:FindFirstChild("HumanoidRootPart") then
-																TeleportTo(L_526_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															else
-																Kill_Jeremy = true
-																break
-															end
-														until not L_526_[3]["Parent"] or L_526_[3]["Humanoid"]["Health"] <= 0 or not L_526_[3]:FindFirstChild("HumanoidRootPart") or not(getgenv())["AutoFarm"]
-														Kill_Jeremy = true
-													end
-												end
-											elseif Utils["ffc"](ReplicatedStorage, "Jeremy") then
-												TeleportTo(ReplicatedStorage["Jeremy"]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-											end
-										end
-									end)
-								until Kill_Orbitus
-							end
-							if not Kill_Diamond then
-								repeat
-									Utils["wt"]()
-									pcall(function()
-										if Utils["ffc"](Enemies, "Diamond") or Utils["ffc"](ReplicatedStorage, "Diamond") then
-											if Utils["ffc"](Enemies, "Diamond") then
-												for L_527_forvar0, L_528_forvar1 in pairs(Enemies:GetChildren()) do
-													local L_529_ = {}
-													L_529_[2], L_529_[1] = L_527_forvar0, L_528_forvar1
-													if L_529_[1]["Name"] == "Diamond" and L_529_[1]["Humanoid"]["Health"] > 0 then
-														repeat
-															Utils["wt"]()
-															if L_529_[1]:FindFirstChild("HumanoidRootPart") then
-																TeleportTo(L_529_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-																if not Utils["ffc"](Player["Character"], "HasBuso") then
-																	ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-																end
-																Attack()
-															else
-																Kill_Diamond = true
-																break
-															end
-														until not L_529_[1]["Parent"] or L_529_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-														Kill_Diamond = true
-													end
-												end
-											elseif Utils["ffc"](ReplicatedStorage, "Diamond") then
-												TeleportTo(ReplicatedStorage["Diamond"]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-											end
-										end
-									end)
-								until Kill_Diamond
-							end
-						else
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "1")
-							Utils["wt"](1)
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "2")
-							warn()
-							if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "1") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "1") == 2 then
-								Quest_Start_Evo_Human_V3 = true
-							end
-						end
-					elseif Player["Data"]["Race"]["Value"] == "Fishman" then
-						if Quest_Start_Evo_Fishman_V3 then
-							local L_530_ = {}
-							L_530_[1] = false
-							L_530_[3] = false
-							for L_531_forvar0, L_532_forvar1 in pairs(Workspace["SeaBeasts"]:GetChildren()) do
-								local L_533_ = {}
-								L_533_[2], L_533_[3] = L_531_forvar0, L_532_forvar1
-								if L_533_[3]:FindFirstChild("Health") and (L_533_[3]["Health"]["Value"] > 0 and (Vector3["new"](-3823.9206542969, 76.979339599609, -11685.7734375) - L_533_[3]["HumanoidRootPart"]["Position"])["Magnitude"] >= 1500) then
-									L_530_[1] = true
-                                    if World1 then
-                                        topos(CFrame.new(4050.31103515625, -1.6880035400390625, -1814.1240234375))
-                                        task.wait(2)
-                                        topos(CFrame.new(61581.8047, 18.8965912, 987.832703))
-                                        Player.Character.Humanoid.PlatformStand = false
-                                        Player.Character.HumanoidRootPart.Anchored = true
-                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                                        task.wait(0.5)
-                                        Player.Character.HumanoidRootPart.Anchored = false
-                                    elseif World2 then
-                                        topos(CFrame.new(-4992.630859375, 43.027259826660156, -4460.2197265625))
-                                        Player.Character.Humanoid.PlatformStand = false
-                                        Player.Character.HumanoidRootPart.Anchored = true
-                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                                        task.wait(0.5)
-                                        Player.Character.HumanoidRootPart.Anchored = false
-                                    elseif World3 then
-                                        topos(CFrame.new(-5024.8525390625, 371.627197265625, -3190.572509765625))
-                                        Player.Character.Humanoid.PlatformStand = false
-                                        Player.Character.HumanoidRootPart.Anchored = true
-                                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyFishmanKarate")
-                                        task.wait(0.5)
-                                        Player.Character.HumanoidRootPart.Anchored = false
-                                    end
-									Tejao = true
-									PositionSkillMasteryDevilFruit = L_533_[3]["HumanoidRootPart"]["CFrame"]
-									Player["Character"]["Humanoid"]["Sit"] = false
-									wait(1)
-									if Player["Character"]["Humanoid"]["Sit"] == false then
-										Boat = nil
-									end
-									repeat
-										wait()
-										TeleportTo(L_533_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 3, 0), 1.5)
-									until (L_533_[3]["HumanoidRootPart"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5 or not(getgenv())["AutoFarm"]
-									repeat
-										wait()
-										Utils["Equip"]("Fishman Karate")
-										if Player["PlayerGui"]["Main"]["Skills"]:FindFirstChild("Fishman Karate") and (tostring(Player["PlayerGui"]["Main"]["Skills"]["Fishman Karate"]["Z"]["Title"]["TextColor"]) == "Institutional white" and Player["PlayerGui"]["Main"]["Skills"]["Fishman Karate"]["Z"]["Cooldown"]["AbsoluteSize"]["X"] == 0) then
-											Utils["Equip"]("Fishman Karate")
-											TeleportTo(L_533_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 3, 0), 1.5)
-											wait(.5)
-											PositionSkillMasteryDevilFruit = L_533_[3]["HumanoidRootPart"]["Position"]
-											if L_533_[3]["Health"]["Value"] > 0 then
-												VirtualInputManager:SendKeyEvent(true, "Z", false, game)
-												wait(.5)
-												VirtualInputManager:SendKeyEvent(false, "Z", false, game)
-												wait(.2)
-											end
-										elseif Player["PlayerGui"]["Main"]["Skills"]:FindFirstChild("Fishman Karate") and (tostring(Player["PlayerGui"]["Main"]["Skills"]["Fishman Karate"]["X"]["Title"]["TextColor"]) == "Institutional white" and Player["PlayerGui"]["Main"]["Skills"]["Fishman Karate"]["X"]["Cooldown"]["AbsoluteSize"]["X"] == 0) then
-											Utils["Equip"]("Fishman Karate")
-											TeleportTo(L_533_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 3, 0), 1.5)
-											wait(.5)
-											PositionSkillMasteryDevilFruit = L_533_[3]["HumanoidRootPart"]["Position"]
-											if L_533_[3]["Health"]["Value"] > 0 then
-												VirtualInputManager:SendKeyEvent(true, "X", false, game)
-												wait(.5)
-												VirtualInputManager:SendKeyEvent(false, "X", false, game)
-												wait(.2)
-											end
-										elseif Player["PlayerGui"]["Main"]["Skills"]:FindFirstChild("Fishman Karate") and (tostring(Player["PlayerGui"]["Main"]["Skills"]["Fishman Karate"]["C"]["Title"]["TextColor"]) == "Institutional white" and Player["PlayerGui"]["Main"]["Skills"]["Fishman Karate"]["C"]["Cooldown"]["AbsoluteSize"]["X"] == 0) then
-											Utils["Equip"]("Fishman Karate")
-											TeleportTo(L_533_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 3, 0), 1.5)
-											wait(.5)
-											PositionSkillMasteryDevilFruit = L_533_[3]["HumanoidRootPart"]["Position"]
-											if L_533_[3]["Health"]["Value"] > 0 then
-												VirtualInputManager:SendKeyEvent(true, "C", false, game)
-												wait(.5)
-												VirtualInputManager:SendKeyEvent(false, "C", false, game)
-												wait(.2)
-											end
-										end
-									until not L_533_[3]["Parent"] or L_533_[3]["Health"]["Value"] <= 0 or not(getgenv())["AutoFarm"]
-									Tejao = false
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "3")
-									wait(1)
-								end
-							end
-							if not L_530_[1] then
-								for L_534_forvar0, L_535_forvar1 in pairs(Workspace["Boats"]:GetChildren()) do
-									local L_536_ = {}
-									L_536_[3], L_536_[1] = L_534_forvar0, L_535_forvar1
-									if L_536_[1]["Name"] == "Dinghy" and tostring(L_536_[1]["Owner"]["Value"]) == Player["Name"] then
-										L_530_[3] = true
-										if (Vector3["new"](3017.2006835938, -4.25, -2686.3325195312) - L_536_[1]["VehicleSeat"]["Position"])["Magnitude"] >= 30 then
-											if Player["Character"]["Humanoid"]["Sit"] then
-												Boat = "Bit"
-												TPBoat(CFrame["new"](1550, -4.25, -2759), L_536_[1]["VehicleSeat"], 200)
-											elseif (Player["Character"]["HumanoidRootPart"]["Position"] - L_536_[1]["VehicleSeat"]["Position"])["Magnitude"] >= 10 then
-												Boat = nil
-												TeleportTo(L_536_[1]["VehicleSeat"]["CFrame"], 1.5)
-											else
-												Boat = "Bit"
-												Player["Character"]["HumanoidRootPart"]["CFrame"] = L_536_[1]["VehicleSeat"]["CFrame"] * CFrame["new"](0, 1, 0)
-												wait(3)
-											end
-										else
-											if Player["Character"]["Humanoid"]["Sit"] then
-												vu:Button1Down(Vector2["new"](1280, 600))
-												wait(1)
-											elseif (Player["Character"]["HumanoidRootPart"]["Position"] - L_536_[1]["VehicleSeat"]["Position"])["Magnitude"] >= 10 then
-												Boat = nil
-												TeleportTo(L_536_[1]["VehicleSeat"]["CFramem"], 1.5)
-											else
-												Boat = "Bit"
-												Player["Character"]["HumanoidRootPart"]["CFrame"] = L_536_[1]["VehicleSeat"]["CFrame"] * CFrame["new"](0, 1, 0)
-												wait(3)
-											end
-										end
-									end
-								end
-							end
-							if not L_530_[3] and not L_530_[1] then
-								TeleportTo(CFrame["new"](-1935, 6, -2564), 1.5)
-								if (Vector3["new"](-1935, 6, -2564) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3 then
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyBoat", "Dinghy")
-									wait(1)
-									Boat = "bit"
-								end
-							end
-						else
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "1")
-							wait(1)
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "2")
-							if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "1") == 1 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Wenlocktoad", "1") == 2 then
-								Quest_Start_Evo_Fishman_V3 = true
-							end
-						end
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-				end
-			elseif Quest == "Don Swan" then
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Don Swan") then
-						for L_537_forvar0, L_538_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_539_ = {}
-							L_539_[1], L_539_[2] = L_537_forvar0, L_538_forvar1
-							if L_539_[2]["Name"] == "Don Swan" and L_539_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_539_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_539_[2]["Parent"] or L_539_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Don Swan")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Don Swan") then
-						for L_540_forvar0, L_541_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_542_ = {}
-							L_542_[3], L_542_[1] = L_540_forvar0, L_541_forvar1
-							if L_542_[1]["Name"] == "Don Swan" and L_542_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_542_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_542_[1]["Parent"] or L_542_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Don Swan")
-							end
-						end
-					else
-						Utils["HopLowServer"](3)
-						Utils["wt"](.2)
-							if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    							require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                task.wait(TimeHop)
-                                require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-							else
-								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-							end
-						Utils["wt"](.1)
-						TeleportService:Teleport(PlaceId, Player)
-					end
-				until not Utils["CheckBoss"]("Don Swan")
-			elseif Quest == "TravelZou" then
-				if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Check") == 1 then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelZou")
-				end
-				if Kill_Don then
-					if Utils["ffc"](Enemies, "rip_indra") then
-						for L_543_forvar0, L_544_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_545_ = {}
-							L_545_[1], L_545_[3] = L_543_forvar0, L_544_forvar1
-							if L_545_[3]["Name"] == "rip_indra" and L_545_[3]["Humanoid"]["Health"] > 0 then
-								if Utils["ffc"](L_545_[3]["Humanoid"], "Animator") then
-									L_545_[3]["Humanoid"]["Animator"]:Destroy()
-								end
-								repeat
-									Utils["wt"](.1)
-									Attack()
-									TeleportTo(L_545_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-								until L_545_[3]["Humanoid"]["Health"] <= 0 or not L_545_[3]["Parent"] or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Check") == 1
-								if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Check") == 1 then
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelZou")
-									TleP = true
-									Utils["wt"](30)
-								end
-							end
-						end
-					elseif ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Check") == 1 then
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelZou")
-						TleP = true
-						Utils["wt"](30)
-					elseif not(game:GetService("Workspace"))["Enemies"]:FindFirstChild("rip_indra") then
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Check")
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Begin")
-						Utils["wt"](3)
-					end
-				elseif not okokok then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Check")
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("ZQuestProgress", "Begin")
-					Utils["wt"](3)
-					for L_546_forvar0, L_547_forvar1 in pairs(Enemies:GetChildren()) do
-						local L_548_ = {}
-						L_548_[1], L_548_[3] = L_546_forvar0, L_547_forvar1
-						if L_548_[3]["Name"] == "rip_indra" then
-							Kill_Don = true
-						end
-					end
-					okokok = true
-				else
-					Attack()
-					Quest = nil
-					SetStatusFarm("Farming Level")
-					FuncA()
-				end
-			elseif Quest == "Yama" then
-				if (Workspace["Map"]["Waterfall"]["SealedKatana"]["Hitbox"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 300 then
-					if Utils["ffc"](Enemies, "Ghost") then
-						for L_549_forvar0, L_550_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_551_ = {}
-							L_551_[2], L_551_[3] = L_549_forvar0, L_550_forvar1
-							if L_551_[3]["Name"] == "Ghost" and L_551_[3]["Humanoid"]["Health"] > 0 then
-								if Utils["ffc"](L_551_[3]["Humanoid"], "Animator") then
-									L_551_[3]["Humanoid"]["Animator"]:Destroy()
-								end
-								repeat
-									wait(.1)
-									Attack()
-									L_551_[3]["HumanoidRootPart"]["Size"] = Vector3["new"](50, 50, 50)
-									TeleportTo(L_551_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 15, 0), 1.5)
-									VirtualUser:Button1Down(Vector2["new"](1280, 600))
-								until not L_551_[3]["Parent"] or L_551_[3]["Humanoid"]["Health"] <= 0
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Ghost") then
-						TeleportTo((ReplicatedStorage:FindFirstChild("Ghost"))["HumanoidRootPart"]["CFrame"], 1.5)
-					elseif not Utils["ffc"](Enemies, "Ghost") and not Utils["ffc"](ReplicatedStorage, "Ghost") then
-						TeleportTo(Workspace["Map"]["Waterfall"]["SealedKatana"]["Hitbox"]["CFrame"], 1.5)
-						for L_552_forvar0, L_553_forvar1 in pairs(Player["Character"]:GetChildren()) do
-							local L_554_ = {}
-							L_554_[2], L_554_[3] = L_552_forvar0, L_553_forvar1
-							if L_554_[3]:IsA("Tool") then
-								L_554_[3]["Parent"] = Player["Backpack"]
-							end
-						end
-						fireclickdetector(Workspace["Map"]["Waterfall"]["SealedKatana"]["Hitbox"]["ClickDetector"], 1)
-					end
-				else
-					TeleportTo(Workspace["Map"]["Waterfall"]["SealedKatana"]["Hitbox"]["CFrame"], 1.5)
-				end
-			elseif Quest == "Quest Electric Claw" then
-				if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw", true) == "Nah." or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw", true) == 4 then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw", "Start")
-					Player["Character"]["HumanoidRootPart"]["CFrame"] = CFrame["new"](-12548, 337, -7481)
-				elseif ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw", true) == 3 or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyElectricClaw", true) == 0 then
-					Electric_Claw_C = true
-				end
-			elseif Quest == "Venom Bow" then
-				if not Utils["CheckBoss"]("Hydra Leader") then
-					return
-				end
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Hydra Leader") then
-						for L_555_forvar0, L_556_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_557_ = {}
-							L_557_[2], L_557_[1] = L_555_forvar0, L_556_forvar1
-							if L_557_[1]["Name"] == "Hydra Leader" and L_557_[1]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_557_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_557_[1]["Parent"] or L_557_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Hydra Leader")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Hydra Leader") then
-						for L_558_forvar0, L_559_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_560_ = {}
-							L_560_[1], L_560_[2] = L_558_forvar0, L_559_forvar1
-							if L_560_[2]["Name"] == "Hydra Leader" and L_560_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_560_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_560_[2]["Parent"] or L_560_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Hydra Leader")
-							end
-						end
-					end
-				until not Utils["CheckBoss"]("Hydra Leader")
-			elseif Quest == "Godhuman" then
-				if Utils["CheckItem"]("Fish Tail") >= 20 and (Utils["CheckItem"]("Magma Ore") >= 20 and (Utils["CheckItem"]("Mystic Droplet") >= 10 and Utils["CheckItem"]("Dragon Scale") >= 10)) then
-            	    if World3 then
-                        Player.Character.Humanoid.PlatformStand = true
-                        topos(CFrame.new(-12551, 337, -7476))
-                        task.wait(1)
-                        topos(CFrame.new(-13775.5732421875, 334.93670654296875, -9881.7685546875))
-                        Player.Character.Humanoid.PlatformStand = false
-                        Player.Character.HumanoidRootPart.Anchored = true
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyGodhuman")
-                        task.wait(0.5)
-                        Player.Character.HumanoidRootPart.Anchored = false
-                    end
-					Godhuman = true
-				elseif Utils["CheckItem"]("Fish Tail") < 20 or Utils["CheckItem"]("Magma Ore") < 20 or Utils["CheckItem"]("Mystic Droplet") < 10 or Utils["CheckItem"]("Dragon Scale") < 10 then
-					local L_561_ = {}
-					L_561_[5] = nil
-					L_561_[4] = nil
-					L_561_[3] = nil
-					L_561_[2] = nil
-					if Utils["CheckItem"]("Fish Tail") < 20 then
-						L_561_[5] = "Fishman Warrior"
-						L_561_[4] = "Fishman Commando"
-						L_561_[3] = CFrame["new"](60946.6094, 65.6735229, 1525.91687)
-						L_561_[2] = CFrame["new"](61902.7383, 32.4828358, 1478.33936)
-						if ((CFrame["new"](61164, 12, 1820))["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] >= 2000 then
-							Player["Character"]["HumanoidRootPart"]["CFrame"] = CFrame["new"](61164, 12, 1820)
-						end
-						if not Old_World then
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelMain")
-							TleP = true
-							Utils["wt"](50)
-						end
-					elseif Utils["CheckItem"]("Magma Ore") < 20 then
-						L_561_[5] = "Magma Ninja"
-						L_561_[4] = "Lava Pirate"
-						L_561_[3] = CFrame["new"](-5466.06445, 77.6952019, -5837.42822)
-						L_561_[2] = CFrame["new"](-5169.71729, 54.1234779, -4669.73633)
-						if not New_World then
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-							TleP = true
-							Utils["wt"](50)
-						end
-					elseif Utils["CheckItem"]("Mystic Droplet") < 10 then
-						L_561_[5] = "Sea Soldier"
-						L_561_[4] = "Water Fighter"
-						L_561_[3] = CFrame["new"](-3115.78223, 63.8785706, -9808.38574)
-						L_561_[2] = CFrame["new"](-3212.99683, 263.809296, -10551.8799)
-						if not New_World then
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-							TleP = true
-							Utils["wt"](50)
-						end
-					elseif Utils["CheckItem"]("Dragon Scale") < 10 then
-						L_561_[5] = "Dragon Crew Warrior"
-						L_561_[4] = "Dragon Crew Archer"
-						L_561_[3] = CFrame["new"](6241.9951171875, 51.522083282471, -1243.9771728516)
-						L_561_[2] = CFrame["new"](6488.9155273438, 383.38375854492, -110.66246032715)
-						if not Three_World then
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelZou")
-							TleP = true
-							Utils["wt"](50)
-						end
-					end
-					if L_561_[5] ~= nil then
-						repeat
-							Utils["wt"]()
-							TeleportTo(L_561_[3])
-						until (L_561_[3]["Position"] - game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-						if Utils["ffc"](Enemies, L_561_[5]) then
-							for L_562_forvar0, L_563_forvar1 in pairs(game["Workspace"]["Enemies"]:GetChildren()) do
-								local L_564_ = {}
-								L_564_[2], L_564_[3] = L_562_forvar0, L_563_forvar1
-								if L_564_[3]["Name"] == L_561_[5] and L_564_[3]["Humanoid"]["Health"] > 0 then
-									StatrMagnet = true
-									repeat
-										Utils["wt"]()
-										TeleportTo(L_564_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 20, 0), 1.5)
-										Attack()
-										Utils["BN"](L_564_[3]["Name"])
-									until not L_564_[3]["Parent"] or L_564_[3]["Humanoid"]["Health"] <= 0
-									StatrMagnet = false
-								end
-							end
-						end
-					end
-					if L_561_[4] ~= nil then
-						repeat
-							Utils["wt"]()
-							TeleportTo(L_561_[2], 1.5)
-						until (L_561_[2]["Position"] - game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-						if game["Workspace"]["Enemies"]:FindFirstChild(L_561_[4]) then
-							for L_565_forvar0, L_566_forvar1 in pairs(game["Workspace"]["Enemies"]:GetChildren()) do
-								local L_567_ = {}
-								L_567_[2], L_567_[3] = L_565_forvar0, L_566_forvar1
-								if L_567_[3]["Name"] == L_561_[4] and L_567_[3]["Humanoid"]["Health"] > 0 then
-									StatrMagnet = true
-									repeat
-										Utils["wt"]()
-										TeleportTo(L_567_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 20, 0), 1.5)
-										Attack()
-										Utils["BN"](L_567_[3]["Name"])
-									until not L_567_[3]["Parent"] or L_567_[3]["Humanoid"]["Health"] <= 0
-									StatrMagnet = false
-								end
-							end
-						end
-					end
-				end
-			elseif Quest == "Longma" then
-				repeat
-					Utils["wt"]()
-					if Utils["ffc"](Enemies, "Longma") then
-						for L_568_forvar0, L_569_forvar1 in pairs(Enemies:GetChildren()) do
-							local L_570_ = {}
-							L_570_[3], L_570_[2] = L_568_forvar0, L_569_forvar1
-							if L_570_[2]["Name"] == "Longma" and L_570_[2]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_570_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_570_[2]["Parent"] or L_570_[2]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Longma")
-							end
-						end
-					elseif Utils["ffc"](ReplicatedStorage, "Longma") then
-						for L_571_forvar0, L_572_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-							local L_573_ = {}
-							L_573_[2], L_573_[3] = L_571_forvar0, L_572_forvar1
-							if L_573_[3]["Name"] == "Longma" and L_573_[3]["Humanoid"]["Health"] > 0 then
-								repeat
-									Utils["wt"]()
-									TeleportTo(L_573_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-									if not Utils["ffc"](Player["Character"], "HasBuso") then
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-									end
-									Attack()
-								until not L_573_[3]["Parent"] or L_573_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"] or not Utils["CheckBoss"]("Longma")
-							end
-						end
-					else
-						Utils["HopLowServer"](3)
-						Utils["wt"](.2)
-						if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    						require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                            task.wait(TimeHop)
-                            require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-						else
-							require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-						end
-						Utils["wt"](.1)
-						TeleportService:Teleport(PlaceId, Player)
-					end
-				until not Utils["CheckBoss"]("Longma")
-			elseif Quest == "Soul Guitar" then
-				if Utils["CheckItem"]("Bones") < 500 then
-				    SendWebhook("Farming Bone (Get Skull Guitar)")
-					if Three_World then
-						Utils["FarmBone"](false)
-					else
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelZou")
-						TleP = true
-						wait(50)
-					end
-				elseif Utils["CheckItem"]("Ectoplasm") < 250 then
-				    SendWebhook("Farming Ectoplasm (Get Skull Guitar)")
-					if New_World then
-						if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](921.30249023438, 125.400390625, 32937.34375))["Magnitude"] >= 3000 then
-							repeat
-								Utils["wt"]()
-								TeleportTo(CFrame["new"](921.30249023438, 125.400390625, 32937.34375), 1.5)
-							until (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](921.30249023438, 125.400390625, 32937.34375))["Magnitude"] <= 3
-						elseif (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](921.30249023438, 125.400390625, 32937.34375))["Magnitude"] < 3000 then
-							Monster = nil
-							for L_574_forvar0 = 1500, 0, -300 do
-								local L_575_ = {}
-								L_575_[2] = L_574_forvar0
-								Utils["GetMonster"](L_575_[2])
-							end
-							if Monster ~= nil and Monster["Humanoid"]["Health"] > 0 then
-								PosMon_X = Monster["HumanoidRootPart"]["CFrame"]
-								StatrMagnet = true
-								repeat
-									wait()
-									TeleportTo(Monster["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 20, 0), 1.5)
-									Attack()
-								until not Monster["Parent"] or Monster["Humanoid"]["Health"] <= 0
-								StatrMagnet = false
-							elseif Monster == nil then
-								for L_576_forvar0 = 1500, 0, -300 do
-									local L_577_ = {}
-									L_577_[2] = L_576_forvar0
-									Utils["GetMonster"](L_577_[2])
-								end
-								if Monster == nil then
-									TeleportTo(CFrame["new"](921.30249023438, 125.400390625, 32937.34375), 1.5)
-								end
-							end
-						end
-					else
-						ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelDressrosa")
-						TleP = true
-						wait(50)
-					end
-				elseif not Three_World then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("TravelZou")
-					TleP = true
-					wait(50)
-				else
-				    SendWebhook("Doing Skull Guitar Quest 1")
-					if tostring((game:GetService("Workspace"))["Map"]["Haunted Castle"]["SwampWater"]["BrickColor"]) == "Maroon" then
-						if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", "Check") ~= nil and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", "Check"))["Swamp"] == false then
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](-10147.779296875, 138.6266784668, 5939.5600585938), 1.5)
-							until (Vector3["new"](-10147.779296875, 138.6266784668, 5939.5600585938) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-							wait(1)
-							get_mon = {}
-							Utils["GetMon_Soul"]()
-							if #get_mon >= 6 then
-								for L_578_forvar0, L_579_forvar1 in pairs(Player["Character"]:GetChildren()) do
-									local L_580_ = {}
-									L_580_[3], L_580_[2] = L_578_forvar0, L_579_forvar1
-									if L_580_[2]:IsA("Tool") then
-										L_580_[2]["Parent"] = Player["Backpack"]
-									end
-								end
-								TeleportTo(CFrame["new"](-10147.779296875, 158.6266784668, 5939.5600585938), 1.5)
-								for L_581_forvar0, L_582_forvar1 in next, (game:GetService("Workspace"))["Enemies"]:GetChildren() do
-									local L_583_ = {}
-									L_583_[2], L_583_[1] = L_581_forvar0, L_582_forvar1
-									if (L_583_[1]["HumanoidRootPart"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 500 then
-										L_583_[1]["HumanoidRootPart"]["CFrame"] = Player["Character"]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 0, 20)
-										sethiddenproperty(Player, "SimulationRadius", math["huge"])
-									end
-								end
-								wait(1)
-								Attack()
-								wait(2)
-							end
-						end
-					elseif ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", "Check") ~= nil then
-						local L_584_ = {}
-						SendWebhook("Doing Skull Guitar Quest 2")
-						L_584_[2] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", "Check")
-						if not Quest_Soul_Guitar then
-							repeat
-								wait(.1)
-								TeleportTo(CFrame["new"](-9680.7412109375, 6.1591067314148, 6346.1552734375), 1.5)
-							until (Vector3["new"](-9680.7412109375, 6.1591067314148, 6346.1552734375) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5
-							wait(1)
-							for L_585_forvar0, L_586_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", "Check")) do
-								local L_587_ = {}
-								L_587_[3], L_587_[1] = L_585_forvar0, L_586_forvar1
-								if L_587_[1] == false then
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", L_587_[3])
-								end
-							end
-							wait(2)
-							for L_588_forvar0, L_589_forvar1 in pairs(ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", "Check")) do
-								local L_590_ = {}
-								L_590_[3], L_590_[1] = L_588_forvar0, L_589_forvar1
-								if L_590_[1] == false then
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GuitarPuzzleProgress", L_590_[3])
-								end
-							end
-							wait(1)
-							Quest_Soul_Guitar = true
-						end
-					elseif tostring((game:GetService("Workspace"))["Map"]["Haunted Castle"]["SwampWater"]["BrickColor"]) ~= "Maroon" then
-						SendWebhook("Doing Skull Guitar Final Quest")
-						if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("gravestoneEvent", 2) == true then
-							ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("gravestoneEvent", 2, true)
-							SendWebhook("Done Get Skull Guitar")
-						else
-							TeleportTo(CFrame["new"](-8652.6416015625, 141.10939025879, 6168.810546875), 1.5)
-						end
-					end
-				end
-			elseif Quest == "RGB" then
-				local L_591_ = {}
-				L_591_[1] = nil
-				if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("HornedMan", "Bet") == nil then
-					if Player["PlayerGui"]["Main"]["Quest"]["Visible"] then
-						local L_592_ = {}
-						L_592_[1] = (game:GetService("Players"))["LocalPlayer"]["PlayerGui"]["Main"]["Quest"]["Container"]["QuestTitle"]["Title"]["Text"]
-						if string["find"](L_592_[1], "Stone") then
-							if Utils["ffc"](Enemies, "Stone") or Utils["ffc"](ReplicatedStorage, "Stone") then
-								L_591_[1] = "Stone"
-							end
-						end
-						if string["find"](L_592_[1], "Hydra Leader") then
-							if Utils["ffc"](Enemies, "Hydra Leader") or Utils["ffc"](ReplicatedStorage, "Hydra Leader") then
-								L_591_[1] = "Hydra Leader"
-							end
-						end
-						if string["find"](L_592_[1], "Kilo Admiral") then
-							if Utils["ffc"](Enemies, "Kilo Admiral") or Utils["ffc"](ReplicatedStorage, "Kilo Admiral") then
-								L_591_[1] = "Kilo Admiral"
-							end
-						end
-						if string["find"](L_592_[1], "Captain Elephant") then
-							if Utils["ffc"](Enemies, "Captain Elephant") or Utils["ffc"](ReplicatedStorage, "Captain Elephant") then
-								L_591_[1] = "Captain Elephant"
-							end
-						end
-						if string["find"](L_592_[1], "Beautiful Pirate") then
-							if Utils["ffc"](Enemies, "Beautiful Pirate") or Utils["ffc"](ReplicatedStorage, "Beautiful Pirate") then
-								L_591_[1] = "Beautiful Pirate"
-							end
-						end
-						if L_591_[1] ~= nil then
-							if Utils["ffc"](Enemies, L_591_[1]) then
-								for L_593_forvar0, L_594_forvar1 in pairs(Enemies:GetChildren()) do
-									local L_595_ = {}
-									L_595_[2], L_595_[3] = L_593_forvar0, L_594_forvar1
-									if L_595_[3]["Name"] == L_591_[1] and L_595_[3]["Humanoid"]["Health"] > 0 then
-										repeat
-											Utils["wt"]()
-											TeleportTo(L_595_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-											if not Utils["ffc"](Player["Character"], "HasBuso") then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-											end
-											Attack()
-										until not L_595_[3]["Parent"] or L_595_[3]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-									end
-								end
-							elseif Utils["ffc"](ReplicatedStorage, L_591_[1]) then
-								for L_596_forvar0, L_597_forvar1 in pairs(ReplicatedStorage:GetChildren()) do
-									local L_598_ = {}
-									L_598_[3], L_598_[1] = L_596_forvar0, L_597_forvar1
-									if L_598_[1]["Name"] == L_591_[1] and L_598_[1]["Humanoid"]["Health"] > 0 then
-										repeat
-											Utils["wt"]()
-											TeleportTo(L_598_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 40, 0), 1.5)
-											if not Utils["ffc"](Player["Character"], "HasBuso") then
-												ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Buso")
-											end
-											Attack()
-										until not L_598_[1]["Parent"] or L_598_[1]["Humanoid"]["Health"] <= 0 or not(getgenv())["AutoFarm"]
-									end
-								end
-							end
-						else
-							if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("HornedMan", "Bet") == 1 then
-								return
-							else
-							    if getgenv().SettingFarm["HOP Delay"]["Enabled"] then
-    								require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub:<Color=/> Wait ".. getgenv().TimeHop .."s hop server"):Display()
-                                    task.wait(TimeHop)
-                                    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								else
-								    require(game:GetService("ReplicatedStorage").Notification).new("<Color=Red>Lonely Hub: Hop!<Color=/>"):Display()
-								end
-								Utils["wt"](.1)
-								TeleportService:Teleport(PlaceId, Player)
-							end
-						end
-					end
-				elseif ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("HornedMan", "Bet") == 1 then
-					return
-				end
-			elseif Quest == "Pull Lerver" then
-				if not ExSeb then
-					if (game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("RaceV4Progress", "Check") == 1 then
-						local L_599_ = {}
-						L_599_[1] = {
-							[1] = "RaceV4Progress";
-							[2] = "Check"
-						};
-						(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer(unpack(L_599_[1]))
-						L_599_[3] = {
-							[1] = "RaceV4Progress";
-							[2] = "Begin"
-						};
-						(((game:GetService("ReplicatedStorage")):WaitForChild("Remotes")):WaitForChild("CommF_")):InvokeServer(unpack(L_599_[3]))
-					elseif (game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("RaceV4Progress", "Check") == 2 then
-						local L_600_ = {}
-						L_600_[1] = {
-							[1] = "RaceV4Progress",
-							[2] = "Check"
-						};
-						(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer(unpack(L_600_[1]))
-						repeat
-							local L_601_ = {}
-							wait()
-							game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"]["CFrame"] = CFrame["new"](2959.87231, 2282.42139, -7216.23193)
-							L_601_[1] = {
-								[1] = "RaceV4Progress",
-								[2] = "Teleport"
-							};
-							(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer(unpack(L_601_[1]))
-						until (game["Players"]["LocalPlayer"]["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](28286.35546875, 14896.5078125, 102.62469482422))["Magnitude"] <= 15
-					elseif (game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("RaceV4Progress", "Check") == 3 then
-						ExSeb = true
-						if not ujihfdg then
-							local L_602_ = {}
-							L_602_[3] = {
-								[1] = "RaceV4Progress";
-								[2] = "Check"
-							};
-							(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer(unpack(L_602_[3]))
-							wait(1)
-							L_602_[2] = {
-								[1] = "RaceV4Progress";
-								[2] = "Continue"
-							};
-							(game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer(unpack(L_602_[2]))
-							ujihfdg = true
-						end
-					elseif (game:GetService("ReplicatedStorage"))["Remotes"]["CommF_"]:InvokeServer("RaceV4Progress", "Check") == 4 then
-						ExSeb = true
-					end
-				else
-					if (game:GetService("Workspace"))["Map"]:FindFirstChild("MysticIsland") then
-					    SendWebhook("Tween To Mirage Island (Pull Lever)")
-						if Player["Character"]["Humanoid"]["Sit"] == true then
-							Player["Character"]["Humanoid"]["Sit"] = false
-							wait(.5)
-							Player["Character"]["HumanoidRootPart"]["CFrame"] = Player["Character"]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 15, 0)
-							wait(1)
-						else
-							local L_603_ = {}
-							L_603_[1] = ((game:GetService("Workspace"))["Map"]:FindFirstChild("MysticIsland"))["WorldPivot"] * CFrame["new"](0, 500, 0)
-							if (L_603_[1]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 25 then
-								task["spawn"](function()
-									repeat
-										wait(.2)
-										Workspace["CurrentCamera"]["CFrame"] = CFrame["lookAt"](Workspace["CurrentCamera"]["CFrame"]["Position"], LightingService:GetMoonDirection() + Workspace["CurrentCamera"]["CFrame"]["Position"])
-									until StopCamera or not(game:GetService("Workspace"))["Map"]:FindFirstChild("MysticIsland") or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CheckTempleDoor")
-								end);
-								((ReplicatedStorage:WaitForChild("Remotes")):WaitForChild("CommE")):FireServer("ActivateAbility")
-								wait(17)
-								for L_604_forvar0, L_605_forvar1 in pairs((game:GetService("Workspace"))["Map"]["MysticIsland"]:GetChildren()) do
-									local L_606_ = {}
-									L_606_[3], L_606_[1] = L_604_forvar0, L_605_forvar1
-									if L_606_[1]["ClassName"] == "MeshPart" and (L_606_[1]["Name"] == "Part" and L_606_[1]["Transparency"] == 0) then
-										repeat
-											wait(.2)
-											StopCamera = true
-											TeleportTo(L_606_[1]["CFrame"], 1.5)
-											wait(.5)
-											VirtualInputManager:SendKeyEvent(true, "Space", false, game)
-											wait(.5)
-											VirtualInputManager:SendKeyEvent(false, "Space", false, game)
-										until L_606_[1]["Transparency"] == 1 or not(game:GetService("Workspace"))["Map"]:FindFirstChild("MysticIsland") or ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CheckTempleDoor")
-										wait(.5)
-									end
-								end
-							else
-								TeleportTo(L_603_[1], 1.5)
-							end
-						end
-					end
-				end
-			elseif Quest == "Cursed Dual Katana" then
-				if ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "OpenDoor") == "opened" then
-					local L_607_ = {}
-					L_607_[2] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "Progress")
-					if L_607_[2]["Good"] == 0 or L_607_[2]["Good"] == -3 then
-						CDK_Q_S_C = 3
-						if L_607_[2]["Good"] == 0 then
-							Utils["GetQuest"]("Good")
-							SendWebhook("Starting Tusita Quest 1 (Get CDK)")
-						elseif L_607_[2]["Good"] == -3 then
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](-4600.37, 15.1245, -2881.18), 1.5)
-								if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](-4600.37, 15.1245, -2881.18))["Magnitude"] <= 3 then
-									wait(1)
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "BoatQuest", Workspace["NPCs"]:FindFirstChild("Luxury Boat Dealer"), "Check")
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GetUnlockables")
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "BoatQuest", Workspace["NPCs"]:FindFirstChild("Luxury Boat Dealer"))
-									wait(.5)
-									Q_Boat_1 = true
-								end
-							until Q_Boat_1
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](-2068.63, 3.37222, -9887.08), 1.5)
-								if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](-2068.63, 3.37222, -9887.08))["Magnitude"] <= 3 then
-									wait(1)
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "BoatQuest", Workspace["NPCs"]:FindFirstChild("Luxury Boat Dealer"), "Check")
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GetUnlockables")
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "BoatQuest", Workspace["NPCs"]:FindFirstChild("Luxury Boat Dealer"))
-									wait(.5)
-									Q_Boat_2 = true
-								end
-							until Q_Boat_2
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](-9531.19, 5.91675, -8377.75), 1.5)
-								if (Player["Character"]["HumanoidRootPart"]["Position"] - Vector3["new"](-9531.19, 5.91675, -8377.75))["Magnitude"] <= 3 then
-									wait(1)
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "BoatQuest", Workspace["NPCs"]:FindFirstChild("Luxury Boat Dealer"), "Check")
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("GetUnlockables")
-									ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "BoatQuest", Workspace["NPCs"]:FindFirstChild("Luxury Boat Dealer"))
-									wait(.5)
-									Q_Boat_3 = true
-								end
-							until Q_Boat_3
-							Q_Boat_1 = false
-							Q_Boat_2 = false
-							Q_Boat_3 = false
-						end
-					elseif L_607_[2]["Evil"] == 0 or L_607_[2]["Evil"] == -3 then
-						CDK_Q_S_C = 4
-						if L_607_[2]["Evil"] == 0 then
-							Utils["GetQuest"]("Evil")
-							SendWebhook("Starting Yama Quest 1 (Get CDK)")
-						elseif L_607_[2]["Evil"] == -3 then
-							Stop_Fast_Attack = true
-							for L_608_forvar0, L_609_forvar1 in pairs(Enemies:GetChildren()) do
-								local L_610_ = {}
-								L_610_[2], L_610_[3] = L_608_forvar0, L_609_forvar1
-								if L_610_[3]:FindFirstChild("HumanoidRootPart") and (L_610_[3]["HumanoidRootPart"]["Position"] - Vector3["new"](-13347.6982, 332.378143, -7652.27783))["Magnitude"] > 10 then
-									L_610_[3]["HumanoidRootPart"]["CFrame"] = CFrame["new"](-13347.6982, 332.378143, -7652.27783)
-									sethiddenproperty(Player, "SimulationRadius", math["huge"])
-								end
-							end
-							TeleportTo(CFrame["new"](-13347.6982, 332.378143, -7652.27783, -0.97929436, 4.50812898e-08, -0.202441484, 4.58302409e-08, 1, 9.8789521e-10, .202441484, -8.31050162e-09, -0.97929436), 1.5)
-						end
-					elseif L_607_[2]["Evil"] == 1 or L_607_[2]["Evil"] == -4 then
-						Stop_Fast_Attack = false
-						CDK_Q_S_C = 5
-						if L_607_[2]["Evil"] == 1 then
-						    SendWebhook("Starting Yama Quest 2 (Get CDK)")
-							Utils["GetQuest"]("Evil")
-						elseif L_607_[2]["Evil"] == -4 then
-							if Utils["ffc"](Player, "QuestHaze") then
-								if Quest_Kill == nil then
-									for L_611_forvar0, L_612_forvar1 in pairs(Player["QuestHaze"]:GetChildren()) do
-										local L_613_ = {}
-										L_613_[2], L_613_[1] = L_611_forvar0, L_612_forvar1
-										if tonumber(L_613_[1]["Value"]) > 0 and Quest_Kill == nil then
-											SelectMonster = L_613_[1]["Name"]
-											CFrameMon = nil
-											CheckLevel2()
-											if CFrameMon ~= nil then
-												Quest_Kill = L_613_[1]["Name"]
-											end
-										end
-									end
-								elseif Utils["ffc"](Player["QuestHaze"], Quest_Kill) and tonumber((Player["QuestHaze"]:FindFirstChild(Quest_Kill))["Value"]) <= 0 then
-									Quest_Kill = nil
-								elseif Utils["ffc"](Player["QuestHaze"], Quest_Kill) and tonumber((Player["QuestHaze"]:FindFirstChild(Quest_Kill))["Value"]) > 0 then
-									for L_614_forvar0, L_615_forvar1 in pairs(Enemies:GetChildren()) do
-										local L_616_ = {}
-										L_616_[1], L_616_[2] = L_614_forvar0, L_615_forvar1
-										if L_616_[2]:FindFirstChild("Humanoid") and (L_616_[2]["Humanoid"]["Health"] > 0 and L_616_[2]:FindFirstChild("HazeESP")) then
-											repeat
-												wait(.1)
-												TeleportTo(L_616_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 25, 0), 1.5)
-												Attack()
-											until not L_616_[2]["Parent"] or L_616_[2]["Humanoid"]["Health"] <= 0
-										end
-									end
-									TeleportTo(CFrameMon, 1.5)
-								else
-									Quest_Kill = nil
-								end
-							end
-						end
-					elseif L_607_[2]["Good"] == 1 or L_607_[2]["Good"] == -4 then
-						CDK_Q_S_C = 6
-						if L_607_[2]["Good"] == 1 then
-							Utils["GetQuest"]("Good")
-							SendWebhook("Starting Tusita Quest 2 (Get CDK)")
-						elseif L_607_[2]["Good"] == -4 then
-							TeleportTo(CFrame["new"](-5543.0805664062, 313.76550292969, -2969.4846191406), 1.5)
-							if (Vector3["new"](-5543.0805664062, 313.76550292969, -2969.4846191406) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 1500 then
-								for L_617_forvar0, L_618_forvar1 in pairs(Enemies:GetChildren()) do
-									local L_619_ = {}
-									L_619_[3], L_619_[1] = L_617_forvar0, L_618_forvar1
-									if L_619_[1]:FindFirstChild("Humanoid") and (L_619_[1]["Humanoid"]["Health"] > 0 and (L_619_[1]["HumanoidRootPart"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 1500) then
-										repeat
-											wait(.3)
-											Attack()
-											TeleportTo(L_619_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-										until not L_619_[1]["Parent"] or L_619_[1]["Humanoid"]["Health"] <= 0
-									end
-								end
-							end
-						end
-					elseif L_607_[2]["Good"] == 2 or L_607_[2]["Good"] == -5 then
-						CDK_Q_S_C = 7
-						if L_607_[2]["Good"] == 2 then
-							Utils["GetQuest"]("Good")
-							SendWebhook("Starting Tusita Final Quest (Get CDK)")
-						elseif L_607_[2]["Good"] == -5 then
-							if not Kill_Boss_Cake then
-								if Utils["ffc"](Enemies, "Cake Queen") then
-									for L_620_forvar0, L_621_forvar1 in pairs(Enemies:GetChildren()) do
-										local L_622_ = {}
-										L_622_[3], L_622_[2] = L_620_forvar0, L_621_forvar1
-										if L_622_[2]["Name"] == "Cake Queen" and (L_622_[2]["Humanoid"]["Health"] > 0 and not Kill_Boss_Cake) then
-											repeat
-												wait(.3)
-												if Utils["ffc"](L_622_[2], "HumanoidRootPart") then
-													TeleportTo(L_622_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-													Attack()
-												else
-													break
-												end
-											until not L_622_[2]["Parent"] or L_622_[2]["Humanoid"]["Health"] <= 0
-											Kill_Boss_Cake = true
-											wait(1)
-										end
-									end
-								else
-									TeleportTo(CFrame["new"](-714.643066, 381.565613, -11021.0566), 1.5)
-								end
-							else
-								if Workspace["Map"]:FindFirstChild("HeavenlyDimension") then
-									if not Ceyma_HeavenlyDimension then
-										repeat
-											wait(.1)
-											TeleportTo((Workspace["Map"]:FindFirstChild("HeavenlyDimension"))["WorldPivot"], 1.5)
-										until ((Workspace["Map"]:FindFirstChild("HeavenlyDimension"))["WorldPivot"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 5
-										wait(1)
-										Ceyma_HeavenlyDimension = true
-									elseif Ceyma_HeavenlyDimension then
-										Attack()
-										if Enemies:FindFirstChildOfClass("Model") then
-											for L_623_forvar0, L_624_forvar1 in pairs(Enemies:GetChildren()) do
-												local L_625_ = {}
-												L_625_[3], L_625_[2] = L_623_forvar0, L_624_forvar1
-												if L_625_[2]:FindFirstChild("HumanoidRootPart") and (L_625_[2]:FindFirstChild("Humanoid") and ((Workspace["Map"]:FindFirstChild("HeavenlyDimension"))["WorldPivot"]["Position"] - L_625_[2]["HumanoidRootPart"]["Position"])["Magnitude"] <= 1000) then
-													if L_625_[2]["Humanoid"]["Health"] > 0 then
-														repeat
-															wait()
-															TeleportTo(L_625_[2]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-															Attack()
-														until not L_625_[2]["Parent"] or L_625_[2]["Humanoid"]["Health"] <= 0
-													end
-												end
-											end
-										elseif not Enemies:FindFirstChildOfClass("Model") then
-											Utils["GetTorch"]("Torch1")
-											if not Enemies:FindFirstChildOfClass("Model") then
-												Utils["GetTorch"]("Torch2")
-												if not Enemies:FindFirstChildOfClass("Model") then
-													Utils["GetTorch"]("Torch3")
-													if not Enemies:FindFirstChildOfClass("Model") and Workspace["Map"]:FindFirstChild("HeavenlyDimension") then
-														Workspace["Map"]["HeavenlyDimension"]["Exit"]["CFrame"] = Player["Character"]["HumanoidRootPart"]["CFrame"]
-														wait(1)
-													end
-												end
-											end
-										end
-									end
-								elseif not Workspace["Map"]:FindFirstChild("HeavenlyDimension") then
-									wait(5)
-									if not Workspace["Map"]:FindFirstChild("HeavenlyDimension") then
-										Kill_Boss_Cake = false
-									end
-								end
-							end
-						end
-					elseif L_607_[2]["Evil"] == 2 or L_607_[2]["Evil"] == -5 then
-						CDK_Q_S_C = 8
-						if L_607_[2]["Evil"] == 2 then
-						    SendWebhook("Starting Yama Final Quest (Get CDK)")
-							Utils["GetQuest"]("Evil")
-						elseif L_607_[2]["Evil"] == -5 then
-							if Workspace["Map"]:FindFirstChild("HellDimension") then
-								if ((Workspace["Map"]:FindFirstChild("HellDimension"))["WorldPivot"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] > 1200 then
-									repeat
-										wait(.1)
-										TeleportTo((Workspace["Map"]:FindFirstChild("HellDimension"))["WorldPivot"], 1.5)
-									until ((Workspace["Map"]:FindFirstChild("HellDimension"))["WorldPivot"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 10
-									wait(1)
-								elseif ((Workspace["Map"]:FindFirstChild("HellDimension"))["WorldPivot"]["Position"] - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 1200 then
-									Attack()
-									if Enemies:FindFirstChildOfClass("Model") then
-										for L_626_forvar0, L_627_forvar1 in pairs(Enemies:GetChildren()) do
-											local L_628_ = {}
-											L_628_[2], L_628_[1] = L_626_forvar0, L_627_forvar1
-											if L_628_[1]:FindFirstChild("HumanoidRootPart") and (L_628_[1]:FindFirstChild("Humanoid") and ((Workspace["Map"]:FindFirstChild("HellDimension"))["WorldPivot"]["Position"] - L_628_[1]["HumanoidRootPart"]["Position"])["Magnitude"] <= 1000) then
-												if L_628_[1]["Humanoid"]["Health"] > 0 then
-													repeat
-														wait()
-														TeleportTo(L_628_[1]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-														Attack()
-													until not L_628_[1]["Parent"] or L_628_[1]["Humanoid"]["Health"] <= 0
-												end
-											end
-										end
-									elseif not Enemies:FindFirstChildOfClass("Model") then
-										Utils["GetTorchX"]("Torch1")
-										if not Enemies:FindFirstChildOfClass("Model") then
-											Utils["GetTorchX"]("Torch2")
-											if not Enemies:FindFirstChildOfClass("Model") then
-												Utils["GetTorchX"]("Torch3")
-												if not Enemies:FindFirstChildOfClass("Model") and Workspace["Map"]:FindFirstChild("HellDimension") then
-													Workspace["Map"]["HellDimension"]["Exit"]["CFrame"] = Player["Character"]["HumanoidRootPart"]["CFrame"]
-													wait(1)
-												end
-											end
-										end
-									end
-								end
-							elseif not Workspace["Map"]:FindFirstChild("HellDimension") then
-								if Enemies:FindFirstChild("Soul Reaper") or game["ReplicatedStorage"]:FindFirstChild("Soul Reaper") then
-									Stop_Fast_Attack = true
-									if not Enemies:FindFirstChild("Soul Reaper") and game["ReplicatedStorage"]:FindFirstChild("Soul Reaper") then
-										repeat
-											wait(.2)
-											TeleportTo((game["ReplicatedStorage"]:FindFirstChild("Soul Reaper"))["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-										until Enemies:FindFirstChild("Soul Reaper")
-										wait(1)
-									end
-									if Enemies:FindFirstChild("Soul Reaper") then
-										TeleportTo((Enemies:FindFirstChild("Soul Reaper"))["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 0, 2), 1.5)
-										wait(1)
-									end
-								elseif ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check") > 0 and Utils["CheckItem"]("Bones") > 500 then
-									repeat
-										wait(.2)
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check")
-										ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Buy", 1, 1)
-									until ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Bones", "Check") == 0
-									wait(1)
-									if not Dragon_Talon_C then
-										if Utils["ffc"](Player["Backpack"], "Fire Essence") or Utils["ffc"](Player["Character"], "Fire Essence") then
-											repeat
-												SetStatusFarm("Using Fire Essence")
-												Utils["Equip"]("Fire Essence")
-												Utils["wt"](.5)
-										        if World3 then
-                                                    Player.Character.Humanoid.PlatformStand = true
-                                                    topos(CFrame.new(5663, 1211, 861))
-                                                    Player.Character.Humanoid.PlatformStand = false
-                                                    Player.Character.HumanoidRootPart.Anchored = true
-                                                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon", true)
-                                                    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyDragonTalon")
-                                                    task.wait(0.5)
-                                                    Player.Character.HumanoidRootPart.Anchored = false
-                                                end
-											until not Utils["ffc"](Player["Backpack"], "Fire Essence") and not Utils["ffc"](Player["Character"], "Fire Essence")
-											ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyDragonTalon")
-											Dragon_Talon_C = true
-										end
-									end
-									if Utils["ffc"](Player["Backpack"], "Hallow Essence") or Utils["ffc"](Player["Character"], "Hallow Essence") then
-										repeat
-											SetStatusFarm("Using Hallow Essence")
-											Utils["Equip"]("Hallow Essence")
-											TeleportTo(CFrame["new"](-8932.86, 143.258, 6063.31), 1.5)
-										until not Utils["ffc"](Player["Backpack"], "Hallow Essence") and not Utils["ffc"](Player["Character"], "Hallow Essence")
-									end
-								elseif not Enemies:FindFirstChild("Soul Reaper") and not ReplicatedStorage:FindFirstChild("Soul Reaper") then
-									Utils["FarmBone"]()
-								end
-							end
-						end
-					elseif L_607_[2]["Evil"] == 3 then
-						repeat
-							wait()
-							TeleportTo(CFrame["new"](-12392.2637, 603.319763, -6503.27832), 1.5)
-						until (Vector3["new"](-12392.2637, 603.319763, -6503.27832) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 2
-						if CoreGui:FindFirstChild("     ") then
-							CoreGui["     "]["Enabled"] = false
-						end
-						wait(1)
-						VirtualInputManager:SendKeyEvent(true, "E", false, game)
-						wait(1)
-						VirtualInputManager:SendKeyEvent(false, "E", false, game)
-						wait(1)
-						Utils["click"](Player["PlayerGui"]["Main"]["Dialogue"])
-					elseif L_607_[2]["Good"] == 3 then
-						repeat
-							wait()
-							TeleportTo(CFrame["new"](-12392.5068, 603.319763, -6596.00586), 1.5)
-						until (Vector3["new"](-12392.5068, 603.319763, -6596.00586) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 2
-						if CoreGui:FindFirstChild("     ") then
-							CoreGui["     "]["Enabled"] = false
-						end
-						wait(1)
-						VirtualInputManager:SendKeyEvent(true, "E", false, game)
-						wait(1)
-						VirtualInputManager:SendKeyEvent(false, "E", false, game)
-						wait(1)
-						Utils["click"](Player["PlayerGui"]["Main"]["Dialogue"])
-					elseif L_607_[2]["Good"] == 4 and (L_607_[2]["Evil"] == 4 and Workspace["Map"]["Turtle"]["Cursed"]["BossDoor"]["Position"]["Y"] > 584) then
-						Attack()
-						SendWebhook("Doing Final Dungeon (Get CDK)")
-						repeat
-							wait(.1)
-							TeleportTo(CFrame["new"](-12359.1719, 603.319702, -6550.59717, .481593847, 0, -0.87639451, 0, 1, 0, .87639451, 0, .481593847), 1.5)
-						until (Vector3["new"](-12359.1719, 603.319702, -6550.59717) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-						if CoreGui:FindFirstChild("     ") then
-							CoreGui["     "]["Enabled"] = false
-						end
-						wait(1)
-						VirtualInputManager:SendKeyEvent(true, "E", false, game)
-						wait(1)
-						VirtualInputManager:SendKeyEvent(false, "E", false, game)
-						wait(1)
-						Utils["click"](Player["PlayerGui"]["Main"]["Dialogue"])
-					elseif Workspace["Map"]["Turtle"]["Cursed"]["BossDoor"]["Position"]["Y"] <= 584 then
-						local L_629_ = {}
-						if CoreGui:FindFirstChild("     ") then
-							CoreGui["     "]["Enabled"] = true
-						end
-						L_629_[1] = ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("getInventory")
-						for L_630_forvar0, L_631_forvar1 in pairs(L_629_[1]) do
-							local L_632_ = {}
-							L_632_[1], L_632_[3] = L_630_forvar0, L_631_forvar1
-							if L_632_[3]["Type"] == "Sword" then
-								if L_632_[3]["Name"] == "Cursed Dual Katana" then
-									return
-								end
-							end
-						end
-						CDK_Q_S_C = 10
-						if (Vector3["new"](-12297.5605, 598.726013, -6532.96436) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 100 then
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](-12379.1406, 601.433167, -6543.60742), 1.5)
-							until Boss_Extant or (Vector3["new"](-12379.1406, 601.433167, -6543.60742) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-							repeat
-								wait()
-								TeleportTo(CFrame["new"](-12330.197265625, 603.31982421875, -6549.1186523438), 1.5)
-								for L_633_forvar0, L_634_forvar1 in pairs(Enemies:GetChildren()) do
-									local L_635_ = {}
-									L_635_[2], L_635_[3] = L_633_forvar0, L_634_forvar1
-									if L_635_[3]["Name"] == "Cursed Skeleton Boss" then
-										Boss_Extant = true
-										Player["Character"]["HumanoidRootPart"]["CFrame"] = L_635_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0)
-									end
-								end
-							until Boss_Extant or (Vector3["new"](-12330.197265625, 603.31982421875, -6549.1186523438) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] <= 3
-							wait(1)
-							for L_636_forvar0, L_637_forvar1 in pairs(Enemies:GetChildren()) do
-								local L_638_ = {}
-								L_638_[2], L_638_[3] = L_636_forvar0, L_637_forvar1
-								if L_638_[3]["Name"] == "Cursed Skeleton Boss" then
-								    SendWebhook("Done Get CDK!")
-									repeat
-										wait(.1)
-										Utils["Get_Item_Inventory"]("Tushita")
-										Utils["Equip"]("Tushita")
-										TeleportTo(L_638_[3]["HumanoidRootPart"]["CFrame"] * CFrame["new"](0, 30, 0), 1.5)
-									until not L_638_[3]["Parent"] or L_638_[3]["Humanoid"]["Health"] <= 0
-									for L_639_forvar0, L_640_forvar1 in pairs(L_629_[1]) do
-										local L_641_ = {}
-										L_641_[2], L_641_[1] = L_639_forvar0, L_640_forvar1
-										if L_641_[1]["Type"] == "Sword" then
-											if L_641_[1]["Name"] == "Cursed Dual Katana" then
-												return
-											end
-										end
-									end
-								end
-							end
-						elseif (Vector3["new"](-12297.5605, 598.726013, -6532.96436) - Player["Character"]["HumanoidRootPart"]["Position"])["Magnitude"] > 100 then
-							TeleportTo(CFrame["new"](-12297.5605, 598.726013, -6532.96436), 1.5)
-						end
-					end
-				else
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("CDKQuest", "OpenDoor", true)
-				end
-			end
-		end, warn)
-	end
-end)
-
-
-
-
-task["spawn"](function()
-	while Utils["wt"]() do
-		xpcall(function()
-			for L_642_forvar0, L_643_forvar1 in pairs(Enemies:GetChildren()) do
-				local L_644_ = {}
-				L_644_[2], L_644_[1] = L_642_forvar0, L_643_forvar1
-				if Utils["ffc"](L_644_[1], "Humanoid") and (L_644_[1]["Humanoid"]["Health"] <= 0 and Utils["ffc"](L_644_[1], "HumanoidRootPart")) then
-					if L_644_[1]["Humanoid"]["Health"] <= 0 then
-						L_644_[1]:Destroy()
-					end
-				end
-			end
-			if Utils["ffc"](Player["Character"], "Black Leg") then
-				VirtualInputManager:SendKeyEvent(true, "V", false, game)
-				Utils["wt"](.1)
-				VirtualInputManager:SendKeyEvent(false, "V", false, game)
-			end
-			if Utils["ffc"](Player["Character"], "HumanoidRootPart") and not Utils["ffc"](Player["Character"]["HumanoidRootPart"], "Lock") then
-				local L_645_ = {}
-				L_645_[1] = Player["Character"]:FindFirstChild("Humanoid")
-				if L_645_[1] and L_645_[1]["Sit"] then
-					L_645_[1]["Sit"] = false
-				end
-				L_645_[2] = Instance["new"]("BodyVelocity")
-				L_645_[2]["Name"] = "Lock"
-				L_645_[2]["MaxForce"] = Vector3["new"](1000000000, 1000000000, 1000000000)
-				L_645_[2]["Velocity"] = Vector3["new"](0, 0, 0)
-				L_645_[2]["P"] = 10000
-				L_645_[2]["Parent"] = Player["Character"]["HumanoidRootPart"]
-			end
-		end, warn)
-	end
-end)
-task["spawn"](function()
-	while Utils["wt"](1) do
-		pcall(function()
-			if not Utils["ffc"](Player["Character"], "Highlight") then
-				local L_646_ = {}
-				L_646_[1] = Instance["new"]("Highlight")
-				L_646_[1]["Name"] = "Highlight"
-				L_646_[1]["FillColor"] = Color3["fromRGB"](220, 220, 220)
-				L_646_[1]["OutlineColor"] = Color3["fromRGB"](255, 80, 80)
-				L_646_[1]["FillTransparency"] = 1
-				L_646_[1]["OutlineTransparency"] = 0
-				L_646_[1]["Adornee"] = Player["Character"]
-				L_646_[1]["Parent"] = Player["Character"]
-			end
-		end)
-	end
-end)
-
-redeem = {
-    "SUB2FER999",
-    "ENYU_IS_PRO",
-    "JCWK",
-    "STARCODEHEO",
-    "MAGICBUS",
-    "KITTGAMING",
-    "SUB2CAPTAINMAUI",
-    "SUB2OFFICIALNOOBIE",
-    "THEGREATACE",
-    "SUB2NOOBMASTER123",
-    "SUB2DAIGROCK",
-    "AXIORE",
-    "STRAWHATMAINE",
-    "TANTAIGAMING",
-    "BLUXXY",
-    "SUB2GAMERROBOT_EXP1",
-    "GAMER_ROBOT_1M",
-    "SUBGAMERROBOT_RESET",
-    "RESET_5B",
-    "SUB2GAMERROBOT_RESET1",
-    "SUB2UNCLEKIZARU",
-    "ADMIN_TROLL",
-    "DRAGONABUSE",
-    "DEVSCOOKING",
-    "LIGHTNINGABUSE",
-    "1LOSTADMIN",
-    "ADMINFIGHT",
-    "NOMOREHACK",
-    "BANEXPLOIT",
-    "KRAZYDARES",
-    "TRIPLEABUSE",
-    "24NOADMIN",
-    "REWARDFUN",
-    "CHANDLER",
-    "NEWTROLL",
-    "KITT_RESET",
-    "FUDD10",
-    "FUDD10_V2",
-    "BIGNEWS",
-    "SECRET_ADMIN",
-    "BOSSBUILD",
-    "WILDDARES",
-    "GETPRANKED",
-    "FIGHT4FRUIT",
-    "EARN_FRUITS"
-}
-task["spawn"](function()
-	for L_647_forvar0, L_648_forvar1 in pairs(redeem) do
-		local L_649_ = {}
-		L_649_[2], L_649_[1] = L_647_forvar0, L_648_forvar1
-		ReplicatedStorage["Remotes"]["Redeem"]:InvokeServer(L_649_[1])
-	end
-end)
-task["spawn"](function()
-	while Utils["wt"](150) do
-		VirtualInputManager:SendKeyEvent(true, "Space", false, game)
-		wait(.5)
-		VirtualInputManager:SendKeyEvent(false, "Space", false, game)
-	end
-end)
-PlayersService = game:GetService("Players")
-Player = PlayersService["LocalPlayer"]
-Runtime[44] = function()
-	while not Player["Character"] or not Player["Character"]:FindFirstChild("HumanoidRootPart") do
-		task["wait"](.5)
-	end
-	return Player["Character"]:WaitForChild("HumanoidRootPart")
-end
-PlayerPosition = (Runtime[44]())["Position"]
-Counter = 0
-Step = 1
-task["spawn"](function()
-	while task["wait"]() do
-		if Quest ~= "Cursed Dual Katana" and (Quest ~= "Evo Race V2" and (Quest ~= "Evo Race V1" and not SROP)) then
-			local L_650_ = {}
-			task["wait"](Step)
-			L_650_[2] = (Runtime[44]())["Position"]
-			L_650_[1] = (L_650_[2] - PlayerPosition)["Magnitude"]
-			if L_650_[1] <= 1 then
-				Counter = Counter + Step
-				if Counter >= 30 and (Quest ~= "Cursed Dual Katana" and (Quest ~= "Evo Race V2" and (Quest ~= "Evo Race V1" and not SROP))) then
-					Utils["HopLowServer"](9)
-				end
-			else
-				Counter = 0
-				PlayerPosition = L_650_[2]
-			end
-		end
-	end
-end)
-task["spawn"](function()
-	while task["wait"]() do
-		if Workspace["Map"]:FindFirstChild("Heavenly") then
-			fireproximityprompt(Workspace["Map"]["HeavenlyDimension"]["Torch1"]["ProximityPrompt"])
-			fireproximityprompt(Workspace["Map"]["HeavenlyDimension"]["Torch2"]["ProximityPrompt"])
-			fireproximityprompt(Workspace["Map"]["HeavenlyDimension"]["Torch3"]["ProximityPrompt"])
-		end
-		if Workspace["Map"]:FindFirstChild("HellDimension") then
-			fireproximityprompt(Workspace["Map"]["HellDimension"]["Torch1"]["ProximityPrompt"])
-			fireproximityprompt(Workspace["Map"]["HellDimension"]["Torch2"]["ProximityPrompt"])
-			fireproximityprompt(Workspace["Map"]["HellDimension"]["Torch3"]["ProximityPrompt"])
-		end
-	end
-end)
-Player["PlayerGui"]["Notifications"]["Enabled"] = false
-task["spawn"](function()
-	while task["wait"]() do
-		pcall(function()
-			if not(game:GetService("Players"))["LocalPlayer"]["Character"]["HumanoidRootPart"]:FindFirstChild("Lock") then
-				local L_651_ = {}
-				if (game["Players"]["LocalPlayer"]["Character"]:WaitForChild("Humanoid"))["Sit"] == true then
-					(game["Players"]["LocalPlayer"]["Character"]:WaitForChild("Humanoid"))["Sit"] = false
-				end
-				L_651_[2] = Instance["new"]("BodyVelocity")
-				L_651_[2]["Name"] = "Lock"
-				L_651_[2]["Parent"] = (game:GetService("Players"))["LocalPlayer"]["Character"]["HumanoidRootPart"]
-				L_651_[2]["MaxForce"] = Vector3["new"](9000000000, 9000000000, 9000000000)
-				L_651_[2]["Velocity"] = Vector3["new"](0, 0, 0)
-			end
-		end)
-	end
-end)
-Utils["wt"](5)
-_G["Ew"] = false
-Ewx = false
-task["spawn"](function()
-	while Utils["wt"]() do
-		pcall(function()
-			if Beli["Value"] >= 2500000 and New_World then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LegendarySwordDealer", "1")
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LegendarySwordDealer", "2")
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("LegendarySwordDealer", "3")
-			end
-			if Utils["tf"](Configs["Gun"], "Kabucha") and (Fragments["Value"] >= 10000 and not Utils["gi"]("Kabucha")) then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BlackbeardReward", "Slingshot", "2")
-			end
-			if Beli["Value"] >= 3000000 then
-				if Utils["tf"](Configs["Sword"], "Bisento") and not Utils["gi"]("Bisento") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Bisento")
-				end
-				if Utils["tf"](Configs["Sword"], "Cutlass") and not Utils["gi"]("Cutlass") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Cutlass")
-				end
-				if Utils["tf"](Configs["Sword"], "Katana") and not Utils["gi"]("Katana") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Katana")
-				end
-				if Utils["tf"](Configs["Sword"], "Dual Katana") and not Utils["gi"]("Dual Katana") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Dual Katana")
-				end
-				if Utils["tf"](Configs["Sword"], "Soul Cane") and not Utils["gi"]("Soul Cane") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Soul Cane")
-				end
-				if Utils["tf"](Configs["Sword"], "Triple Katana") and not Utils["gi"]("Triple Katana") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Triple Katana")
-				end
-				if Utils["tf"](Configs["Sword"], "Iron Mace") and not Utils["gi"]("Iron Mace") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Iron Mace")
-				end
-				if Utils["tf"](Configs["Sword"], "Pipe") and not Utils["gi"]("Pipe") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Pipe")
-				end
-				if Utils["tf"](Configs["Sword"], "Dual-Headed Blade") and not Utils["gi"]("Dual-Headed Blade") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Dual-Headed Blade")
-				end
-				if Utils["tf"](Configs["Gun"], "Musket") and not Utils["gi"]("Musket") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Musket")
-				end
-				if Utils["tf"](Configs["Gun"], "Flintlock") and not Utils["gi"]("Flintlock") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Flintlock")
-				end
-				if Utils["tf"](Configs["Gun"], "Refined Slingshot") and not Utils["gi"]("Refined Slingshot") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Refined Slingshot")
-				end
-				if Utils["tf"](Configs["Gun"], "Dual Flintlock") and not Utils["gi"]("Dual Flintlock") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Dual Flintlock")
-				end
-				if Utils["tf"](Configs["Gun"], "Cannon") and not Utils["gi"]("Cannon") then
-					ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyItem", "Cannon")
-				end
-			end
-			if Utils["tf"](Configs["Sword"], "Midnight Blade") and (ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Ectoplasm", "Check") >= 100 and not Utils["gi"]("Midnight Blade")) then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("Ectoplasm", "Buy", 3)
-			end
-			if not klmdlkgf and Level["Value"] >= 2000 then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyHaki", "Geppo")
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyHaki", "Soru")
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("KenTalk", "Buy")
-				klmdlkgf = true
-			end
-			if not klmdlkgfx and Level["Value"] >= 1000 then
-				ReplicatedStorage["Remotes"]["CommF_"]:InvokeServer("BuyHaki", "Buso")
-				klmdlkgfx = true
-			end
-			Utils["wt"](100)
-		end)
-	end
-end)
